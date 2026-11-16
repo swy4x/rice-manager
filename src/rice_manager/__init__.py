@@ -1,3 +1,1 @@
-"""Rice Manager: safety-first desktop rice profile management."""
-
-__version__ = "0.1.0"
+"""Rice Manager: safety-first desktop rice profile management."""\n\n__version__ = "0.2.0"\n
