@@ -43,6 +43,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--destination",
         help="Backup directory (default: ~/.local/share/rice-manager/backups).",
     )
+    restore_parser = profile_commands.add_parser(
+        "restore", help="Preview a backup restore; use --apply to make changes."
+    )
+    restore_parser.add_argument("backup", help="Path to a Rice Manager backup directory.")
+    restore_parser.add_argument(
+        "--apply", action="store_true", help="Apply the restore after creating safety backups."
+    )
     return parser
 
 
@@ -98,9 +105,20 @@ def main() -> None:
                 destination = create_backup(manifest, args.destination)
                 print(f"Backup created: {destination}")
                 print("Only writable user components were included; system/read-only components were skipped.")
-                print("This version creates backups only; restore is not implemented yet.")
                 return
-        except (ManifestError, BackupError) as exc:
+
+            if args.profile_command == "restore":
+                plan = restore_backup(args.backup, apply=args.apply)
+                print("Restore applied." if args.apply else "Restore preview (no files changed):")
+                for item in plan.items:
+                    state = "restored" if args.apply else ("replace existing" if item.target.exists() else "create")
+                    print(f"  [{state}] {item.name}: {item.target}")
+                if args.apply:
+                    print("Existing destinations were safety-backed up before replacement.")
+                else:
+                    print("\\nRun the same command with --apply to restore these components.")
+                return
+        except (ManifestError, BackupError, RestoreError) as exc:
             raise SystemExit(f"Rice Manager error: {exc}") from exc
 
 
