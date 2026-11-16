@@ -103,12 +103,12 @@ def main() -> None:
             if args.profile_command == "plan":
                 plan = build_switch_plan(manifest)
                 print(f"Switch preflight: {plan.profile_name} ({plan.profile_id})")
-                print("\\nComponents:")
+                print("\nComponents:")
                 for item in plan.items:
                     print(f"  [{item.status}] {item.name}: {item.path}")
                     print(f"      {item.detail}")
                 blocked = sum(item.status.startswith("blocked-") for item in plan.items)
-                print(f"\\nReady: {plan.ready_count} | Skipped: {plan.skipped_count} | Blocked: {blocked}")
+                print(f"\nReady: {plan.ready_count} | Skipped: {plan.skipped_count} | Blocked: {blocked}")
                 print("Dry-run only: no files were created, copied, or changed.")
                 print("Profile activation is not implemented yet.")
                 if plan.blocked:
