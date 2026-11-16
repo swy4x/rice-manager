@@ -9,6 +9,16 @@ from pathlib import Path
 from typing import Any
 
 
+def _config_home() -> Path:
+    """Use XDG_CONFIG_HOME when it is an absolute path, otherwise the default."""
+    fallback = Path.home() / ".config"
+    configured = os.environ.get("XDG_CONFIG_HOME")
+    if not configured:
+        return fallback
+    candidate = Path(configured).expanduser()
+    return candidate if candidate.is_absolute() else fallback
+
+
 def inspect_path(label: str, path: Path) -> dict[str, Any]:
     """Describe a path without reading or changing its contents."""
     expanded = path.expanduser()
@@ -37,7 +47,7 @@ def inspect_path(label: str, path: Path) -> dict[str, Any]:
 def inspect_system() -> dict[str, Any]:
     """Collect a conservative, read-only summary of the current system."""
     home = Path.home()
-    config = home / ".config"
+    config = _config_home()
 
     candidates = [
         ("Hyprland user config", config / "hypr"),
@@ -51,7 +61,7 @@ def inspect_system() -> dict[str, Any]:
     return {
         "platform": platform.platform(),
         "home": str(home),
-        "config_home": os.environ.get("XDG_CONFIG_HOME", str(config)),
+        "config_home": str(config),
         "python": platform.python_version(),
         "tools": {name: shutil.which(name) for name in tools},
         "paths": [inspect_path(label, path) for label, path in candidates],
