@@ -88,7 +88,7 @@ def main() -> None:
                 if args.apply:
                     print("Existing destinations were safety-backed up before replacement.")
                 else:
-                    print("\\nRun the same command with --apply to restore these components.")
+                    print("\nRun the same command with --apply to restore these components.")
                 return
 
             manifest = load_manifest(args.manifest)
