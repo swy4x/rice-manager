@@ -36,6 +36,8 @@ def build_parser() -> argparse.ArgumentParser:
     ):
         sub = profile_commands.add_parser(name, help=help_text)
         sub.add_argument("manifest", help="Path to a profile manifest JSON file.")
+        if name == "plan":
+            sub.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
 
     backup_parser = profile_commands.add_parser(
         "backup", help="Back up writable user components from a profile."
@@ -53,6 +55,34 @@ def build_parser() -> argparse.ArgumentParser:
         "--apply", action="store_true", help="Apply the restore after creating safety backups."
     )
     return parser
+
+
+def _plan_json(plan) -> dict:
+    blocked_count = sum(item.status.startswith("blocked-") for item in plan.items)
+    return {
+        "schema_version": 1,
+        "profile": {
+            "id": plan.profile_id,
+            "name": plan.profile_name,
+        },
+        "items": [
+            {
+                "component_id": item.component_id,
+                "name": item.name,
+                "path": str(item.path),
+                "status": item.status,
+                "detail": item.detail,
+            }
+            for item in plan.items
+        ],
+        "summary": {
+            "ready": plan.ready_count,
+            "skipped": plan.skipped_count,
+            "blocked": blocked_count,
+        },
+        "blocked": plan.blocked,
+        "dry_run": True,
+    }
 
 
 def main() -> None:
@@ -102,6 +132,10 @@ def main() -> None:
 
             if args.profile_command == "plan":
                 plan = build_switch_plan(manifest)
+                if args.json:
+                    print(json.dumps(_plan_json(plan), indent=2))
+                    return
+
                 print(f"Switch preflight: {plan.profile_name} ({plan.profile_id})")
                 print("\nComponents:")
                 for item in plan.items:
