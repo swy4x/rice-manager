@@ -7,6 +7,7 @@ import json
 
 from . import __version__
 from .backup import BackupError, create_backup
+from .restore import RestoreError, restore_backup
 from .manifest import ManifestError, load_manifest, resolve_source
 from .system import inspect_path, inspect_system
 
