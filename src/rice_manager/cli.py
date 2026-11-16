@@ -9,6 +9,7 @@ from . import __version__
 from .backup import BackupError, create_backup
 from .restore import RestoreError, restore_backup
 from .manifest import ManifestError, load_manifest, resolve_source
+from .planner import build_switch_plan
 from .system import inspect_path, inspect_system
 
 
@@ -31,6 +32,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name, help_text in (
         ("validate", "Validate a profile manifest."),
         ("inspect", "Inspect profile component paths (read-only)."),
+        ("plan", "Preview profile activation prerequisites (read-only)."),
     ):
         sub = profile_commands.add_parser(name, help=help_text)
         sub.add_argument("manifest", help="Path to a profile manifest JSON file.")
@@ -96,6 +98,23 @@ def main() -> None:
                 print(f"Valid manifest: {manifest.name} ({manifest.id})")
                 print(f"Version: {manifest.version}")
                 print(f"Components: {len(manifest.components)}")
+                return
+
+            if args.profile_command == "plan":
+                plan = build_switch_plan(manifest)
+                print(f"Switch preflight: {plan.profile_name} ({plan.profile_id})")
+                print("\\nComponents:")
+                for item in plan.items:
+                    print(f"  [{item.status}] {item.name}: {item.path}")
+                    print(f"      {item.detail}")
+                blocked = sum(item.status.startswith("blocked-") for item in plan.items)
+                print(f"\\nReady: {plan.ready_count} | Skipped: {plan.skipped_count} | Blocked: {blocked}")
+                print("Dry-run only: no files were created, copied, or changed.")
+                print("Profile activation is not implemented yet.")
+                if plan.blocked:
+                    print("Preflight result: BLOCKED")
+                else:
+                    print("Preflight result: no blocking issues detected")
                 return
 
             if args.profile_command == "inspect":
