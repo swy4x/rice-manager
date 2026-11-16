@@ -47,7 +47,19 @@ rice-manager profile backup examples/caelestia/manifest.json
 
 Backups default to `~/.local/share/rice-manager/backups`. An alternate destination can be provided with `--destination /path/to/backups`. Only existing `user` components not marked `read_only` are copied. System-scoped components are always skipped. Missing required components or type mismatches abort the operation. Backups are staged and published only after successful copying.
 
-A backup contains `backup.json` metadata and a `components/` directory. Preview a restore first; preview mode never changes files:\n\n```bash\nrice-manager profile restore /path/to/backup\n```\n\nApply only after reviewing the paths:\n\n```bash\nrice-manager profile restore /path/to/backup --apply\n```\n\nWhen applying, existing destinations are copied to a timestamped `pre-restore-*` safety snapshot before replacement. Restore refuses destinations outside your home directory, symlink destinations, invalid metadata, and unsafe backup paths. System-wide configuration is not restored.
+A backup contains `backup.json` metadata and a `components/` directory. Preview a restore first; preview mode never changes files:
+
+```bash
+rice-manager profile restore /path/to/backup
+```
+
+Apply only after reviewing the paths:
+
+```bash
+rice-manager profile restore /path/to/backup --apply
+```
+
+When applying, existing destinations are copied to a timestamped `pre-restore-*` safety snapshot before replacement. Restore refuses destinations outside your home directory, symlink destinations, invalid metadata, and unsafe backup paths. System-wide configuration is not restored.
 
 ## Manifest format
 
