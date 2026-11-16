@@ -2,7 +2,7 @@
 
 A safety-first rice and dotfile profile manager for Arch Linux, starting with Hyprland and Quickshell.
 
-> **Status: early development.** Version 0.2 adds read-only profile manifest validation and component inspection. Backup/restore, profile activation, GitHub importing, and the Quickshell GUI are not implemented yet.
+> **Status: early development.** Version 0.3 adds explicit, non-destructive backups of writable user-scoped profile components. Restore, profile activation, GitHub importing, and the Quickshell GUI are not implemented yet.
 
 ## Goals
 
@@ -19,10 +19,11 @@ A safety-first rice and dotfile profile manager for Arch Linux, starting with Hy
 - No silent replacement of existing configuration.
 - No `sudo` operations in the manager.
 - No shell evaluation of imported dotfiles or manifest values.
-- Every future write operation must have a preview and a recoverable backup.
-- System-wide configurations (such as `/etc/xdg`) are detected but never modified automatically.
+- Backups are explicit and never overwrite an existing backup.
+- System-wide configurations (such as `/etc/xdg`) are detected but never modified or backed up automatically.
+- Restore and activation are not implemented yet.
 
-## Current commands
+## Commands
 
 Inspect the current environment:
 
@@ -31,19 +32,22 @@ rice-manager inspect
 rice-manager inspect --json
 ```
 
-Validate the example Caelestia profile manifest:
+Validate and inspect the example profile:
 
 ```bash
 rice-manager profile validate examples/caelestia/manifest.json
-```
-
-Inspect the component paths declared by that manifest (read-only):
-
-```bash
 rice-manager profile inspect examples/caelestia/manifest.json
 ```
 
-A manifest describes components; it does not copy, activate, link, or modify them. The example includes a system-scoped Caelestia path marked read-only. Adjust paths in your own manifest for your machine.
+Back up writable user components:
+
+```bash
+rice-manager profile backup examples/caelestia/manifest.json
+```
+
+Backups default to `~/.local/share/rice-manager/backups`. An alternate destination can be provided with `--destination /path/to/backups`. Only existing `user` components not marked `read_only` are copied. System-scoped components are always skipped. Missing required components or type mismatches abort the operation. Backups are staged and published only after successful copying.
+
+A backup contains `backup.json` metadata and a `components/` directory. This release does not restore backups yet.
 
 ## Manifest format
 
@@ -73,7 +77,8 @@ python -m unittest discover -s tests
 - [x] Repository initialized
 - [x] Read-only environment inspection CLI
 - [x] Profile manifest and validation
-- [ ] Backup and restore engine
+- [x] Explicit user-component backup engine
+- [ ] Restore engine
 - [ ] Dry-run switch planner
 - [ ] Transactional profile activation
 - [ ] Quickshell GUI
