@@ -2,7 +2,7 @@
 
 A safety-first rice and dotfile profile manager for Arch Linux, starting with Hyprland and Quickshell.
 
-> **Status: early development.** Version 0.4 adds preview-first backup restoration with automatic safety snapshots of existing user configuration. Profile activation, GitHub importing, and the Quickshell GUI are not implemented yet.
+> **Status: early development.** Version 0.5 adds a read-only profile activation preflight planner. Profile activation, GitHub importing, and the Quickshell GUI are not implemented yet.
 
 ## Goals
 
@@ -37,6 +37,7 @@ Validate and inspect the example profile:
 ```bash
 rice-manager profile validate examples/caelestia/manifest.json
 rice-manager profile inspect examples/caelestia/manifest.json
+rice-manager profile plan examples/caelestia/manifest.json
 ```
 
 Back up writable user components:
@@ -60,6 +61,8 @@ rice-manager profile restore /path/to/backup --apply
 ```
 
 When applying, existing destinations are copied to a timestamped `pre-restore-*` safety snapshot before replacement. Restore refuses destinations outside your home directory, symlink destinations, invalid metadata, and unsafe backup paths. System-wide configuration is not restored.
+
+The `profile plan` command is a dry-run preflight only. It checks user component paths, required components, declared file/directory types, and unsafe destinations. System-scoped and read-only components are skipped. It does not install profile files or switch the active desktop; profile payload storage and transactional activation are future work.
 
 ## Manifest format
 
@@ -91,7 +94,7 @@ python -m unittest discover -s tests
 - [x] Profile manifest and validation
 - [x] Explicit user-component backup engine
 - [x] Preview-first restore engine
-- [ ] Dry-run switch planner
+- [x] Read-only profile activation preflight planner
 - [ ] Transactional profile activation
 - [ ] Quickshell GUI
 - [ ] Git repository importer
