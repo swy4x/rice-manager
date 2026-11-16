@@ -1,5 +1,6 @@
 import Quickshell
 import QtQuick
+import Quickshell.Io
 
 FloatingWindow {
     id: root
@@ -15,6 +16,52 @@ FloatingWindow {
     property color muted: "#8995a5"
     property color panel: "#121923"
     property color border: "#243140"
+    property var planData: ({})
+    property string backendStatus: "LOADING"
+    property string backendError: ""
+
+    function refreshPlan() {
+        backendStatus = "CHECKING"
+        backendError = ""
+        planProcess.running = true
+    }
+
+    Process {
+        id: planProcess
+        command: [
+            "rice-manager",
+            "profile",
+            "plan",
+            decodeURIComponent(Qt.resolvedUrl("../examples/caelestia/manifest.json").toString().replace("file://", "")),
+            "--json"
+        ]
+        running: true
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.planData = JSON.parse(this.text)
+                    root.backendStatus = "CONNECTED"
+                    root.backendError = ""
+                } catch (error) {
+                    root.backendStatus = "INVALID DATA"
+                    root.backendError = String(error)
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (this.text.trim().length > 0)
+                    root.backendError = this.text.trim()
+            }
+        }
+
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0)
+                root.backendStatus = "BACKEND ERROR"
+        }
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -202,11 +249,17 @@ FloatingWindow {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: "●  PROTOTYPE"
-                                color: "#8fe0b8"
+                                text: "●  " + root.backendStatus
+                                color: root.backendStatus === "CONNECTED" ? "#8fe0b8" : "#f0c674"
                                 font.pixelSize: 9
                                 font.bold: true
                                 font.letterSpacing: 0.7
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: root.refreshPlan()
                             }
                         }
                     }
@@ -277,8 +330,8 @@ FloatingWindow {
                             Repeater {
                                 model: [
                                     { label: "PROFILES", value: "01", note: "Example manifest" },
-                                    { label: "COMPONENTS", value: "02", note: "Declared entries" },
-                                    { label: "PROTECTED", value: "01", note: "System / read-only" }
+                                    { label: "COMPONENTS", value: root.planData.items ? String(root.planData.items.length).padStart(2, "0") : "--", note: "Live manifest entries" },
+                                    { label: "PROTECTED", value: root.planData.summary ? String(root.planData.summary.skipped).padStart(2, "0") : "--", note: "System / read-only" }
                                 ]
 
                                 delegate: Rectangle {
@@ -351,22 +404,24 @@ FloatingWindow {
                                     }
 
                                     Text {
-                                        text: "Example profile manifest"
+                                        text: root.planData.profile ? root.planData.profile.name : "Loading profile manifest…"
                                         color: "#e5edf5"
                                         font.pixelSize: 13
                                         font.bold: true
                                     }
 
                                     Text {
-                                        text: "READY"
-                                        color: "#8fe0b8"
+                                        text: root.planData.blocked ? "BLOCKED" : (root.planData.profile ? "READY" : "WAITING")
+                                        color: root.planData.blocked ? "#f0c674" : "#8fe0b8"
                                         font.pixelSize: 10
                                         font.bold: true
                                     }
                                 }
 
                                 Text {
-                                    text: "Static sample   ·   Not connected to the Python core"
+                                    text: root.planData.summary
+                                        ? "Ready " + root.planData.summary.ready + "   ·   Skipped " + root.planData.summary.skipped + "   ·   Blocked " + root.planData.summary.blocked + "   ·   Dry-run only"
+                                        : (root.backendError.length > 0 ? root.backendError : "Waiting for Python backend…")
                                     color: root.muted
                                     font.pixelSize: 11
                                 }
@@ -374,7 +429,7 @@ FloatingWindow {
                         }
 
                         Text {
-                            text: "This screen is a UI preview. Live system data and actions will be connected in a later release."
+                            text: "Live preflight data from the Python core. Click the status badge above to refresh. No files are changed."
                             color: "#718092"
                             font.pixelSize: 10
                             wrapMode: Text.WordWrap
