@@ -2,7 +2,7 @@
 
 A safety-first rice and dotfile profile manager for Arch Linux, starting with Hyprland and Quickshell.
 
-> **Status: early development.** Version 0.5 adds a read-only profile activation preflight planner. Profile activation, GitHub importing, and the Quickshell GUI are not implemented yet.
+> **Status: early development.** Version 0.6 adds the first Quickshell desktop UI prototype alongside the read-only profile activation preflight planner. Profile activation, GitHub importing, and the Quickshell GUI are not implemented yet.
 
 ## Goals
 
@@ -64,6 +64,16 @@ When applying, existing destinations are copied to a timestamped `pre-restore-*`
 
 The `profile plan` command is a dry-run preflight only. It checks user component paths, required components, declared file/directory types, and unsafe destinations. System-scoped and read-only components are skipped. It does not install profile files or switch the active desktop; profile payload storage and transactional activation are future work.
 
+## Quickshell UI prototype
+
+The first desktop UI is a read-only visual prototype. It does not yet read live system data or execute profile actions. Run it directly from the repository without installing or changing your Quickshell configuration:
+
+```bash
+qs -p ./ui
+```
+
+This uses Quickshell's standard floating application window. The prototype is isolated under `ui/`; it does not touch `~/.config/quickshell` or the system Caelestia files.
+
 ## Manifest format
 
 Manifest schema version 1 is JSON. Each component declares an ID, display name, kind, source path, and scope (`user` or `system`). Optional flags mark required components and read-only sources. The only supported path variables are `${HOME}`, `${XDG_CONFIG_HOME}`, and `${XDG_DATA_HOME}`; they are expanded as literal paths, never as shell code.
@@ -96,7 +106,7 @@ python -m unittest discover -s tests
 - [x] Preview-first restore engine
 - [x] Read-only profile activation preflight planner
 - [ ] Transactional profile activation
-- [ ] Quickshell GUI
+- [x] Initial Quickshell UI prototype\n- [ ] Connect GUI to Python core
 - [ ] Git repository importer
 - [ ] Dependency detection and optional install plans
 
