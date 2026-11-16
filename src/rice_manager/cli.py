@@ -79,6 +79,18 @@ def main() -> None:
 
     if args.command == "profile":
         try:
+            if args.profile_command == "restore":
+                plan = restore_backup(args.backup, apply=args.apply)
+                print("Restore applied." if args.apply else "Restore preview (no files changed):")
+                for item in plan.items:
+                    state = "restored" if args.apply else ("replace existing" if item.target.exists() else "create")
+                    print(f"  [{state}] {item.name}: {item.target}")
+                if args.apply:
+                    print("Existing destinations were safety-backed up before replacement.")
+                else:
+                    print("\\nRun the same command with --apply to restore these components.")
+                return
+
             manifest = load_manifest(args.manifest)
             if args.profile_command == "validate":
                 print(f"Valid manifest: {manifest.name} ({manifest.id})")
@@ -107,17 +119,6 @@ def main() -> None:
                 print("Only writable user components were included; system/read-only components were skipped.")
                 return
 
-            if args.profile_command == "restore":
-                plan = restore_backup(args.backup, apply=args.apply)
-                print("Restore applied." if args.apply else "Restore preview (no files changed):")
-                for item in plan.items:
-                    state = "restored" if args.apply else ("replace existing" if item.target.exists() else "create")
-                    print(f"  [{state}] {item.name}: {item.target}")
-                if args.apply:
-                    print("Existing destinations were safety-backed up before replacement.")
-                else:
-                    print("\\nRun the same command with --apply to restore these components.")
-                return
         except (ManifestError, BackupError, RestoreError) as exc:
             raise SystemExit(f"Rice Manager error: {exc}") from exc
 
