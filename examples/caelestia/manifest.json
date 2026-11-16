@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "id": "caelestia",
+  "name": "Caelestia + Hyprland",
+  "version": "1.0.0",
+  "description": "The existing Hyprland and system-provided Caelestia setup.",
+  "components": [
+    {
+      "id": "hyprland",
+      "name": "Hyprland user configuration",
+      "kind": "config-directory",
+      "source": "${XDG_CONFIG_HOME}/hypr",
+      "scope": "user",
+      "required": true,
+      "read_only": false
+    },
+    {
+      "id": "caelestia-quickshell",
+      "name": "System Caelestia configuration",
+      "kind": "config-directory",
+      "source": "/etc/xdg/quickshell/caelestia",
+      "scope": "system",
+      "required": false,
+      "read_only": true
+    }
+  ]
+}
