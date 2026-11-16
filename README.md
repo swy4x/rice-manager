@@ -2,7 +2,7 @@
 
 A safety-first rice and dotfile profile manager for Arch Linux, starting with Hyprland and Quickshell.
 
-> **Status: early development.** Version 0.6 adds the first Quickshell desktop UI prototype alongside the read-only profile activation preflight planner. Profile activation, GitHub importing, and the Quickshell GUI are not implemented yet.
+> **Status: early development.** Version 0.7 connects the Quickshell dashboard to the Python read-only preflight planner. Profile activation and GitHub importing are not implemented yet.
 
 ## Goals
 
@@ -38,6 +38,7 @@ Validate and inspect the example profile:
 rice-manager profile validate examples/caelestia/manifest.json
 rice-manager profile inspect examples/caelestia/manifest.json
 rice-manager profile plan examples/caelestia/manifest.json
+rice-manager profile plan examples/caelestia/manifest.json --json
 ```
 
 Back up writable user components:
@@ -66,13 +67,13 @@ The `profile plan` command is a dry-run preflight only. It checks user component
 
 ## Quickshell UI prototype
 
-The first desktop UI is a read-only visual prototype. It does not yet read live system data or execute profile actions. Run it directly from the repository without installing or changing your Quickshell configuration:
+The Quickshell dashboard reads the example manifest through the Python CLI and displays live read-only preflight results. It does not execute profile actions. Run it directly from the repository without installing or changing your Quickshell configuration:
 
 ```bash
 qs -p ./ui
 ```
 
-This uses Quickshell's standard floating application window. The prototype is isolated under `ui/`; it does not touch `~/.config/quickshell` or the system Caelestia files.
+This uses Quickshell's standard floating application window. The UI invokes `rice-manager profile plan --json` as a child process (without a shell) and parses its output. The prototype is isolated under `ui/`; it does not touch `~/.config/quickshell` or the system Caelestia files. Click the status badge to refresh the preflight.
 
 ## Manifest format
 
@@ -106,7 +107,8 @@ python -m unittest discover -s tests
 - [x] Preview-first restore engine
 - [x] Read-only profile activation preflight planner
 - [ ] Transactional profile activation
-- [x] Initial Quickshell UI prototype\n- [ ] Connect GUI to Python core
+- [x] Initial Quickshell UI prototype
+- [x] Connect GUI to Python core (read-only preflight)
 - [ ] Git repository importer
 - [ ] Dependency detection and optional install plans
 
