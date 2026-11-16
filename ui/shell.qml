@@ -38,7 +38,7 @@ FloatingWindow {
                         spacing: 5
 
                         Text {
-                            text: "RICE<span>"
+                            text: "RICE"
                             color: root.accent
                             font.pixelSize: 23
                             font.bold: true
@@ -121,8 +121,6 @@ FloatingWindow {
                             }
                         }
                     }
-
-                    Item { width: 1; height: 1; Layout.fillHeight: true }
 
                     Rectangle {
                         width: parent.width
@@ -353,7 +351,7 @@ FloatingWindow {
                                     }
 
                                     Text {
-                                        text: "Caelestia + Hyprland"
+                                        text: "Example profile manifest"
                                         color: "#e5edf5"
                                         font.pixelSize: 13
                                         font.bold: true
@@ -368,7 +366,7 @@ FloatingWindow {
                                 }
 
                                 Text {
-                                    text: "1 ready   ·   1 skipped   ·   0 blocked     /     Preview only"
+                                    text: "Static sample   ·   Not connected to the Python core"
                                     color: root.muted
                                     font.pixelSize: 11
                                 }
