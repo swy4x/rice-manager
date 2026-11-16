@@ -92,8 +92,8 @@ def inspect_backup(backup_dir: str | Path) -> RestorePlan:
         if kind not in {"config-directory", "config-file"} or rel != f"components/{cid}":
             raise RestoreError(f"Invalid backup component declaration: {cid}")
         target = Path(target_text)
-        parent = target.parent.resolve(strict=False)
-        if target == home or not _inside(parent, home):
+        resolved_target = target.resolve(strict=False)
+        if resolved_target == home or not _inside(resolved_target, home):
             raise RestoreError(f"Refusing destination outside home directory: {target}")
         source = root / rel
         if source.is_symlink() or not _inside(source.resolve(strict=False), root.resolve()):
@@ -116,6 +116,9 @@ def restore_backup(backup_dir: str | Path, *, apply: bool = False) -> RestorePla
 
     home = Path.home().resolve()
     safety_root = home / ".local/share/rice-manager/backups"
+    if safety_root.is_symlink() or not _inside(safety_root.resolve(strict=False), home):
+        raise RestoreError("Rice Manager safety-backup path is unsafe (symlink or outside home).")
+    safety_root = safety_root.resolve(strict=False)
     for item in plan.items:
         if item.target.is_symlink():
             raise RestoreError(f"Refusing symlink destination: {item.target}")
