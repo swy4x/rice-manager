@@ -19,6 +19,10 @@ FloatingWindow {
     property var planData: ({})
     property var profilesData: ({})
     property string profilesError: ""
+    property string selectedManifest: ""
+    property string selectedProfileName: ""
+    property var detailData: ({})
+    property string detailError: ""
     property string backendStatus: "LOADING"
     property string backendError: ""
 
@@ -27,6 +31,20 @@ FloatingWindow {
         backendError = ""
         planProcess.running = true
         profilesProcess.running = true
+        if (currentPage === "Profile Details" && selectedManifest.length > 0) {
+            detailData = ({})
+            detailError = ""
+            detailProcess.running = true
+        }
+    }
+
+    function openProfile(manifest, name) {
+        selectedManifest = manifest
+        selectedProfileName = name
+        detailData = ({})
+        detailError = ""
+        currentPage = "Profile Details"
+        detailProcess.running = true
     }
 
     function statusColor(status) {
@@ -101,6 +119,41 @@ FloatingWindow {
                 if (this.text.trim().length > 0)
                     root.profilesError = this.text.trim()
             }
+        }
+    }
+
+    Process {
+        id: detailProcess
+        command: [
+            Quickshell.shellDir + "/../.venv/bin/rice-manager",
+            "profile",
+            "plan",
+            root.selectedManifest,
+            "--json"
+        ]
+        running: false
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.detailData = JSON.parse(this.text)
+                    root.detailError = ""
+                } catch (error) {
+                    root.detailError = String(error)
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (this.text.trim().length > 0)
+                    root.detailError = this.text.trim()
+            }
+        }
+
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0 && root.detailError.length === 0)
+                root.detailError = "Profile details command failed."
         }
     }
 
@@ -357,7 +410,7 @@ FloatingWindow {
                                 anchors.bottom: parent.bottom
                                 anchors.rightMargin: 22
                                 anchors.bottomMargin: 14
-                                text: "RM  /  0.9"
+                                text: "RM  /  0.11"
                                 color: "#476174"
                                 font.pixelSize: 11
                                 font.bold: true
@@ -709,6 +762,13 @@ FloatingWindow {
                                         wrapMode: Text.WrapAnywhere
                                     }
                                 }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: modelData.valid
+                                    cursorShape: modelData.valid ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    onClicked: root.openProfile(modelData.manifest, modelData.name)
+                                }
                             }
                         }
 
@@ -729,7 +789,159 @@ FloatingWindow {
                     }
 
                     Column {
-                        visible: root.currentPage !== "Overview" && root.currentPage !== "Components"
+                        visible: root.currentPage === "Profile Details"
+                        width: parent.width
+                        spacing: 14
+
+                        Row {
+                            width: parent.width
+                            spacing: 12
+
+                            Rectangle {
+                                width: 82
+                                height: 30
+                                radius: 6
+                                color: "#18232e"
+                                border.width: 1
+                                border.color: root.border
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "← BACK"
+                                    color: root.accent
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: root.currentPage = "Profiles"
+                                }
+                            }
+
+                            Column {
+                                spacing: 4
+                                Text {
+                                    text: root.selectedProfileName
+                                    color: "#edf4fa"
+                                    font.pixelSize: 17
+                                    font.bold: true
+                                }
+                                Text {
+                                    text: root.selectedManifest
+                                    color: root.muted
+                                    font.pixelSize: 9
+                                    wrapMode: Text.WrapAnywhere
+                                }
+                            }
+                        }
+
+                        Text {
+                            visible: root.detailError.length > 0
+                            width: parent.width
+                            text: root.detailError
+                            color: "#ff9aa2"
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Row {
+                            visible: root.detailData.summary !== undefined
+                            spacing: 18
+                            Text { text: "READY  " + (root.detailData.summary ? root.detailData.summary.ready : 0); color: "#8fe0b8"; font.pixelSize: 10 }
+                            Text { text: "SKIPPED  " + (root.detailData.summary ? root.detailData.summary.skipped : 0); color: root.accent; font.pixelSize: 10 }
+                            Text { text: "BLOCKED  " + (root.detailData.summary ? root.detailData.summary.blocked : 0); color: "#ff7b86"; font.pixelSize: 10 }
+                        }
+
+                        Repeater {
+                            model: root.detailData.items ? root.detailData.items : []
+                            delegate: Rectangle {
+                                required property var modelData
+                                width: parent.width
+                                height: 166
+                                radius: 10
+                                color: root.panel
+                                border.width: 1
+                                border.color: root.statusColor(modelData.status)
+
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 14
+                                    spacing: 6
+
+                                    Row {
+                                        width: parent.width
+                                        Text {
+                                            width: parent.width - 100
+                                            text: modelData.name + "  /  " + modelData.component_id
+                                            color: "#edf4fa"
+                                            font.pixelSize: 12
+                                            font.bold: true
+                                            elide: Text.ElideRight
+                                        }
+                                        Text {
+                                            text: modelData.status.toUpperCase()
+                                            color: root.statusColor(modelData.status)
+                                            font.pixelSize: 9
+                                            font.bold: true
+                                        }
+                                    }
+
+                                    Text {
+                                        text: modelData.kind.toUpperCase() + "  ·  " + modelData.scope.toUpperCase()
+                                            + (modelData.required ? "  ·  REQUIRED" : "  ·  OPTIONAL")
+                                            + (modelData.read_only ? "  ·  READ-ONLY" : "")
+                                        color: root.accent
+                                        font.pixelSize: 9
+                                    }
+                                    Text {
+                                        width: parent.width
+                                        text: "SOURCE  " + modelData.source
+                                        color: "#b6c4d2"
+                                        font.pixelSize: 10
+                                        wrapMode: Text.WrapAnywhere
+                                    }
+                                    Text {
+                                        width: parent.width
+                                        text: "TARGET  " + modelData.path
+                                        color: "#b6c4d2"
+                                        font.pixelSize: 10
+                                        wrapMode: Text.WrapAnywhere
+                                    }
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.detail
+                                        color: root.muted
+                                        font.pixelSize: 10
+                                        wrapMode: Text.WordWrap
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            visible: root.detailData.items && root.detailData.items.length === 0
+                            text: "This profile has no component entries."
+                            color: root.muted
+                            font.pixelSize: 11
+                        }
+
+                        Text {
+                            visible: Object.keys(root.detailData).length === 0 && root.detailError.length === 0
+                            text: "Loading read-only profile details…"
+                            color: root.muted
+                            font.pixelSize: 11
+                        }
+
+                        Text {
+                            text: "Profile details are generated from the validated manifest and a read-only preflight. No configuration files are changed."
+                            color: "#718092"
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+
+                    Column {
+                        visible: root.currentPage !== "Overview" && root.currentPage !== "Components" && root.currentPage !== "Profiles" && root.currentPage !== "Profile Details"
                         width: parent.width
                         spacing: 12
 
