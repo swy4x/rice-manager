@@ -10,6 +10,7 @@ from .backup import BackupError, create_backup
 from .restore import RestoreError, restore_backup
 from .manifest import ManifestError, load_manifest, resolve_source
 from .planner import build_switch_plan
+from .profiles import ProfileDiscoveryError, discover_profiles
 from .system import inspect_path, inspect_system
 
 
@@ -39,6 +40,11 @@ def build_parser() -> argparse.ArgumentParser:
         if name == "plan":
             sub.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
 
+    list_parser = profile_commands.add_parser(
+        "list", help="Discover profile manifests in a directory (read-only)."
+    )
+    list_parser.add_argument("directory", help="Directory containing profile subdirectories.")
+    list_parser.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
     backup_parser = profile_commands.add_parser(
         "backup", help="Back up writable user components from a profile."
     )
@@ -111,6 +117,30 @@ def main() -> None:
 
     if args.command == "profile":
         try:
+            if args.profile_command == "list":
+                profiles = discover_profiles(args.directory)
+                if args.json:
+                    print(json.dumps({
+                        "schema_version": 1,
+                        "directory": args.directory,
+                        "profiles": profiles,
+                    }, indent=2))
+                    return
+                print(f"Discovered profiles: {len(profiles)}")
+                for profile in profiles:
+                    if profile["valid"]:
+                        summary = profile["summary"]
+                        print(
+                            f"  [{profile['id']}] {profile['name']} "
+                            f"— components {profile['component_count']}, "
+                            f"ready {summary['ready']}, skipped {summary['skipped']}, "
+                            f"blocked {summary['blocked']}"
+                        )
+                    else:
+                        print(f"  [invalid] {profile['directory']}: {profile['error']}")
+                print("Read-only discovery; no files were changed.")
+                return
+
             if args.profile_command == "restore":
                 plan = restore_backup(args.backup, apply=args.apply)
                 print("Restore applied." if args.apply else "Restore preview (no files changed):")
@@ -172,7 +202,7 @@ def main() -> None:
                 print("Only writable user components were included; system/read-only components were skipped.")
                 return
 
-        except (ManifestError, BackupError, RestoreError) as exc:
+        except (ManifestError, BackupError, RestoreError, ProfileDiscoveryError) as exc:
             raise SystemExit(f"Rice Manager error: {exc}") from exc
 
 
