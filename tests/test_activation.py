@@ -122,6 +122,34 @@ class ActivationTests(unittest.TestCase):
             self.run_apply(home, profile, manifest, apply=True)
             self.assertEqual((destination / "keep.conf").read_text(), "untouched")
 
+    def test_failed_multi_file_apply_rolls_back_prior_replacements(self):
+        import os
+        from unittest.mock import patch
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            profile, manifest = self.make_profile(home)
+            (profile / "payload/hypr/zzz.conf").write_text("second file", encoding="utf-8")
+            destination = home / ".config/hypr"
+            destination.mkdir(parents=True)
+            (destination / "hyprland.conf").write_text("original", encoding="utf-8")
+
+            real_replace = os.replace
+            calls = {"count": 0}
+
+            def fail_second_replace(source, target):
+                calls["count"] += 1
+                if calls["count"] == 2:
+                    raise OSError("simulated installation failure")
+                return real_replace(source, target)
+
+            with patch("rice_manager.activation.os.replace", side_effect=fail_second_replace):
+                with self.assertRaises(ActivationError):
+                    self.run_apply(home, profile, manifest, apply=True)
+
+            self.assertEqual((destination / "hyprland.conf").read_text(), "original")
+            self.assertFalse((destination / "zzz.conf").exists())
+
     def test_payload_symlink_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
