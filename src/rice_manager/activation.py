@@ -186,18 +186,34 @@ def apply_profile_payload(
         ))
 
         saved_components: list[dict] = []
+        original_states: list[dict] = []
         for index, item in enumerate(operations):
             target = item["target"]
+            if target.is_symlink() or (target.exists() and not target.is_file()):
+                raise ActivationError(f"Destination changed during apply preparation: {target}")
             if target.exists():
+                before = target.stat(follow_symlinks=False)
                 saved_path = safety_directory / "components" / item["component_id"] / f"{index}-{target.name}"
                 saved_path.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(target, saved_path, follow_symlinks=False)
+                after = target.stat(follow_symlinks=False)
+                before_signature = (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns)
+                after_signature = (after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns)
+                if before_signature != after_signature:
+                    raise ActivationError(f"Destination changed while it was being backed up: {target}")
+                original_states.append({
+                    "existed": True,
+                    "signature": before_signature,
+                    "backup": saved_path,
+                })
                 saved_components.append({
                     "component_id": item["component_id"],
                     "component": item["component_name"],
                     "destination": str(target),
                     "backup_path": str(saved_path.relative_to(safety_directory)),
                 })
+            else:
+                original_states.append({"existed": False, "signature": None, "backup": None})
 
         metadata = {
             "schema_version": 1,
@@ -208,35 +224,48 @@ def apply_profile_payload(
             "note": "File-level pre-apply safety snapshot; extra destination files were not changed.",
         }
         (safety_directory / "apply-safety.json").write_text(
-            json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
+            json.dumps(metadata, indent=2) + "\\n", encoding="utf-8"
         )
 
         # Stage every payload file beside its destination so os.replace is atomic.
         for item in operations:
+            source = item["source"]
+            if source.is_symlink() or not source.is_file():
+                raise ActivationError(f"Payload changed during apply preparation: {source}")
             target = item["target"]
-            if target.is_symlink() or (target.exists() and not target.is_file()):
-                raise ActivationError(f"Destination changed during apply preparation: {target}")
             fd, temp_name = tempfile.mkstemp(prefix=".rice-manager-stage-", dir=target.parent)
             os.close(fd)
             staged = Path(temp_name)
             try:
-                shutil.copy2(item["source"], staged, follow_symlinks=False)
+                shutil.copy2(source, staged, follow_symlinks=False)
             except Exception:
                 staged.unlink(missing_ok=True)
                 raise
             staged_files.append((staged, target))
 
-        for staged, target in staged_files:
-            existed = target.exists()
-            backup_copy = None
-            if existed:
-                index = next(i for i, pair in enumerate(staged_files) if pair[0] == staged)
-                item = operations[index]
-                backup_copy = safety_directory / "components" / item["component_id"] / f"{index}-{target.name}"
-            if target.is_symlink() or (target.exists() and not target.is_file()):
+        for index, (staged, target) in enumerate(staged_files):
+            original = original_states[index]
+            if target.is_symlink():
                 raise ActivationError(f"Destination changed during installation: {target}")
+            currently_exists = target.exists()
+            if currently_exists != original["existed"]:
+                raise ActivationError(f"Destination changed during installation: {target}")
+            if currently_exists:
+                current = target.stat(follow_symlinks=False)
+                signature = (current.st_dev, current.st_ino, current.st_size, current.st_mtime_ns)
+                if signature != original["signature"]:
+                    raise ActivationError(f"Destination changed during installation: {target}")
             os.replace(staged, target)
-            installed.append({"target": target, "existed": existed, "backup": backup_copy})
+            installed_stat = target.stat(follow_symlinks=False)
+            installed.append({
+                "target": target,
+                "existed": original["existed"],
+                "backup": original["backup"],
+                "installed_signature": (
+                    installed_stat.st_dev, installed_stat.st_ino,
+                    installed_stat.st_size, installed_stat.st_mtime_ns,
+                ),
+            })
 
         report["dry_run"] = False
         report["safety_backup"] = str(safety_directory)
@@ -247,15 +276,25 @@ def apply_profile_payload(
         for item in reversed(installed):
             target = item["target"]
             try:
+                if target.is_symlink():
+                    raise OSError("destination became a symlink during rollback")
+                if target.exists():
+                    current = target.stat(follow_symlinks=False)
+                    signature = (current.st_dev, current.st_ino, current.st_size, current.st_mtime_ns)
+                    if signature != item["installed_signature"]:
+                        raise OSError("destination changed after installation; refusing to overwrite it")
                 if item["existed"] and item["backup"] is not None:
                     fd, temp_name = tempfile.mkstemp(prefix=".rice-manager-rollback-", dir=target.parent)
                     os.close(fd)
                     rollback_stage = Path(temp_name)
-                    shutil.copy2(item["backup"], rollback_stage, follow_symlinks=False)
-                    os.replace(rollback_stage, target)
-                elif target.exists() and not target.is_symlink():
+                    try:
+                        shutil.copy2(item["backup"], rollback_stage, follow_symlinks=False)
+                        os.replace(rollback_stage, target)
+                    finally:
+                        rollback_stage.unlink(missing_ok=True)
+                elif target.exists():
                     target.unlink()
-            except OSError as rollback_exc:
+            except Exception as rollback_exc:
                 rollback_errors.append(f"{target}: {rollback_exc}")
         for staged, _ in staged_files:
             staged.unlink(missing_ok=True)
