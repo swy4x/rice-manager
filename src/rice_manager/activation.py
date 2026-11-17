@@ -111,8 +111,10 @@ def apply_profile_payload(
             })
 
     targets = [item["target"] for item in operations]
-    if len(set(targets)) != len(targets):
-        raise ActivationError("Multiple payload entries resolve to the same destination.")
+    for index, target in enumerate(targets):
+        for other in targets[index + 1:]:
+            if target == other or target in other.parents or other in target.parents:
+                raise ActivationError("Payload entries contain overlapping destination paths.")
     report = {
         "schema_version": 1,
         "profile": {"id": manifest.id, "name": manifest.name},
@@ -132,8 +134,12 @@ def apply_profile_payload(
             "UNCHANGED": inventory["summary"]["UNCHANGED"],
         },
         "dry_run": not apply,
+        "applied": False,
     }
-    if not apply or not operations:
+    if not apply:
+        return report
+    if not operations:
+        report["message"] = "No changes required; destinations already match the payload."
         return report
 
     safety_root = Path(backup_root).expanduser() if backup_root else (
@@ -268,6 +274,7 @@ def apply_profile_payload(
             })
 
         report["dry_run"] = False
+        report["applied"] = True
         report["safety_backup"] = str(safety_directory)
         report["message"] = "Payload installed. Existing files were snapshotted; extra files were left untouched."
         return report
