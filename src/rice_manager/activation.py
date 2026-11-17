@@ -12,7 +12,6 @@ from pathlib import Path
 from .manifest import Manifest, ManifestError, resolve_source
 from .payload_inventory import (
     PayloadInventoryError,
-    _payload_files,
     _safe_payload_path,
     build_payload_inventory,
 )
@@ -312,6 +311,8 @@ def apply_profile_payload(
                 f"Apply failed ({exc}); rollback was incomplete. Safety snapshot retained at "
                 f"{safety_directory}. " + "; ".join(rollback_errors)
             ) from exc
+        if safety_directory is None:
+            raise ActivationError(f"Apply failed before any payload files were installed: {exc}") from exc
         raise ActivationError(
             f"Apply failed and changes were rolled back: {exc}. "
             f"Safety snapshot retained at {safety_directory}."
