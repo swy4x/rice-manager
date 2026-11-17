@@ -7,6 +7,7 @@ from rice_manager.profile_import import (
     ProfileImportError,
     import_profile,
     preview_profile_import,
+    remove_imported_profile,
 )
 
 
@@ -65,6 +66,48 @@ class ProfileImportTests(unittest.TestCase):
             with self.assertRaises(ProfileImportError):
                 import_profile(source, library)
             self.assertEqual(marker.read_text(), "keep")
+
+    def test_remove_deletes_only_validated_library_profile(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = self.make_profile(root)
+            library = root / "library"
+            destination = import_profile(source, library)
+            removed = remove_imported_profile("test-rice", library)
+            self.assertEqual(removed, destination)
+            self.assertFalse(destination.exists())
+
+    def test_remove_rejects_path_traversal_profile_id(self):
+        with tempfile.TemporaryDirectory() as temp:
+            with self.assertRaises(ProfileImportError):
+                remove_imported_profile("../outside", Path(temp))
+
+    def test_remove_rejects_symlinked_profile_directory(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            library = root / "library"
+            library.mkdir()
+            outside = root / "outside"
+            outside.mkdir()
+            (outside / "keep.txt").write_text("keep", encoding="utf-8")
+            (library / "test-rice").symlink_to(outside, target_is_directory=True)
+            with self.assertRaises(ProfileImportError):
+                remove_imported_profile("test-rice", library)
+            self.assertEqual((outside / "keep.txt").read_text(encoding="utf-8"), "keep")
+
+    def test_remove_rejects_manifest_id_mismatch(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = self.make_profile(root)
+            library = root / "library"
+            destination = import_profile(source, library)
+            manifest_path = destination / "manifest.json"
+            data = json.loads(manifest_path.read_text(encoding="utf-8"))
+            data["id"] = "other-rice"
+            manifest_path.write_text(json.dumps(data), encoding="utf-8")
+            with self.assertRaises(ProfileImportError):
+                remove_imported_profile("test-rice", library)
+            self.assertTrue(destination.exists())
 
     def test_symlinks_are_rejected(self):
         with tempfile.TemporaryDirectory() as temp:
