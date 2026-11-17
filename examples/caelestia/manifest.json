@@ -4,6 +4,10 @@
   "name": "Caelestia + Hyprland",
   "version": "1.0.0",
   "description": "The existing Hyprland and system-provided Caelestia setup.",
+  "dependencies": [
+    "hyprland",
+    "waybar"
+  ],
   "components": [
     {
       "id": "hyprland",
