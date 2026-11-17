@@ -8,6 +8,7 @@ from rice_manager.profile_import import (
     import_profile,
     preview_profile_import,
     remove_imported_profile,
+    preview_profile_removal,
 )
 
 
@@ -66,6 +67,18 @@ class ProfileImportTests(unittest.TestCase):
             with self.assertRaises(ProfileImportError):
                 import_profile(source, library)
             self.assertEqual(marker.read_text(), "keep")
+
+    def test_remove_preview_does_not_delete_profile(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            source = self.make_profile(root)
+            library = root / "library"
+            destination = import_profile(source, library)
+            result = preview_profile_removal("test-rice", library)
+            self.assertTrue(result["dry_run"])
+            self.assertFalse(result["removed"])
+            self.assertEqual(result["profile_name"], "Test Rice")
+            self.assertTrue(destination.exists())
 
     def test_remove_deletes_only_validated_library_profile(self):
         with tempfile.TemporaryDirectory() as temp:
