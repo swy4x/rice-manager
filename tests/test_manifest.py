@@ -34,6 +34,36 @@ class ManifestTests(unittest.TestCase):
         manifest = load_manifest(self.write_manifest(self.valid_data()))
         self.assertEqual(manifest.id, "test-rice")
         self.assertEqual(manifest.components[0].id, "hyprland")
+        self.assertEqual(manifest.dependencies, ())
+
+    def test_load_valid_package_dependencies(self):
+        data = self.valid_data()
+        data["dependencies"] = ["hyprland", "qt6-wayland", "python-pyqt6"]
+        manifest = load_manifest(self.write_manifest(data))
+        self.assertEqual(
+            manifest.dependencies,
+            ("hyprland", "qt6-wayland", "python-pyqt6"),
+        )
+
+    def test_reject_non_array_dependencies(self):
+        data = self.valid_data()
+        data["dependencies"] = "hyprland"
+        with self.assertRaises(ManifestError):
+            load_manifest(self.write_manifest(data))
+
+    def test_reject_invalid_package_dependency(self):
+        for package in ("", "../hyprland", "hyprland;touch/tmp/pwned", "two words"):
+            with self.subTest(package=package):
+                data = self.valid_data()
+                data["dependencies"] = [package]
+                with self.assertRaises(ManifestError):
+                    load_manifest(self.write_manifest(data))
+
+    def test_reject_duplicate_package_dependencies(self):
+        data = self.valid_data()
+        data["dependencies"] = ["hyprland", "hyprland"]
+        with self.assertRaises(ManifestError):
+            load_manifest(self.write_manifest(data))
 
     def test_reject_duplicate_component_ids(self):
         data = self.valid_data()
