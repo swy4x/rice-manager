@@ -11,6 +11,7 @@ from .restore import RestoreError, restore_backup
 from .manifest import ManifestError, load_manifest, resolve_source
 from .planner import build_switch_plan
 from .profiles import ProfileDiscoveryError, discover_profiles
+from .profile_import import ProfileImportError, import_profile, preview_profile_import
 from .system import inspect_path, inspect_system
 
 
@@ -45,6 +46,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     list_parser.add_argument("directory", help="Directory containing profile subdirectories.")
     list_parser.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
+    import_parser = profile_commands.add_parser(
+        "import", help="Preview or import a local profile directory into the private library."
+    )
+    import_parser.add_argument("source", help="Local profile directory containing manifest.json.")
+    import_parser.add_argument("--library", help="Profile library directory (default: ~/.local/share/rice-manager/profiles).")
+    import_parser.add_argument("--apply", action="store_true", help="Copy the profile after reviewing the preview.")
+    import_parser.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
     backup_parser = profile_commands.add_parser(
         "backup", help="Back up writable user components from a profile."
     )
@@ -148,6 +156,26 @@ def main() -> None:
                 print("Read-only discovery; no files were changed.")
                 return
 
+            if args.profile_command == "import":
+                plan = preview_profile_import(args.source, args.library)
+                if args.apply:
+                    destination = import_profile(args.source, args.library)
+                    plan["destination"] = str(destination)
+                    plan["dry_run"] = False
+                if args.json:
+                    print(json.dumps(plan, indent=2))
+                    return
+                print("Profile import preview (no files changed):" if not args.apply else "Profile imported:")
+                print(f"  Profile: {plan['profile_name']} ({plan['profile_id']})")
+                print(f"  Source: {plan['source']}")
+                print(f"  Destination: {plan['destination']}")
+                print(f"  Files: {plan['file_count']} | Total bytes: {plan['total_bytes']}")
+                for item in plan["files"]:
+                    print(f"    {item['path']} ({item['size']} bytes)")
+                if not args.apply:
+                    print("\\nRun the same command with --apply only after reviewing this file list.")
+                return
+
             if args.profile_command == "restore":
                 plan = restore_backup(args.backup, apply=args.apply)
                 print("Restore applied." if args.apply else "Restore preview (no files changed):")
@@ -209,7 +237,7 @@ def main() -> None:
                 print("Only writable user components were included; system/read-only components were skipped.")
                 return
 
-        except (ManifestError, BackupError, RestoreError, ProfileDiscoveryError) as exc:
+        except (ManifestError, BackupError, RestoreError, ProfileDiscoveryError, ProfileImportError) as exc:
             raise SystemExit(f"Rice Manager error: {exc}") from exc
 
 
