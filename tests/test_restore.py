@@ -60,6 +60,16 @@ class RestoreTests(unittest.TestCase):
                 with self.assertRaises(RestoreError):
                     inspect_backup(backup)
 
+    def test_rejects_symlinked_backup_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp); home = base / "home"; home.mkdir()
+            backup = self.make_backup(base, home / ".config/hypr")
+            linked = base / "backup-link"
+            linked.symlink_to(backup, target_is_directory=True)
+            with patch("rice_manager.restore.Path.home", return_value=home):
+                with self.assertRaises(RestoreError):
+                    inspect_backup(linked)
+
     def test_rejects_symlinked_backup_metadata(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp); home = base / "home"; home.mkdir()
