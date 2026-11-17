@@ -11,7 +11,7 @@ from .restore import RestoreError, restore_backup
 from .manifest import ManifestError, load_manifest, resolve_source
 from .planner import build_switch_plan
 from .profiles import ProfileDiscoveryError, discover_profiles
-from .profile_import import ProfileImportError, import_profile, preview_profile_import
+from .profile_import import ProfileImportError, import_profile, preview_profile_import, remove_imported_profile
 from .system import inspect_path, inspect_system
 
 
@@ -53,6 +53,13 @@ def build_parser() -> argparse.ArgumentParser:
     import_parser.add_argument("--library", help="Profile library directory (default: ~/.local/share/rice-manager/profiles).")
     import_parser.add_argument("--apply", action="store_true", help="Copy the profile after reviewing the preview.")
     import_parser.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
+    remove_parser = profile_commands.add_parser(
+        "remove", help="Preview or remove one imported profile from the private library."
+    )
+    remove_parser.add_argument("profile_id", help="ID of the imported profile to remove.")
+    remove_parser.add_argument("--library", help="Profile library directory (default: ~/.local/share/rice-manager/profiles).")
+    remove_parser.add_argument("--apply", action="store_true", help="Permanently remove the profile after reviewing the preview.")
+    remove_parser.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
     backup_parser = profile_commands.add_parser(
         "backup", help="Back up writable user components from a profile."
     )
@@ -174,6 +181,45 @@ def main() -> None:
                     print(f"    {item['path']} ({item['size']} bytes)")
                 if not args.apply:
                     print("\nRun the same command with --apply only after reviewing this file list.")
+                return
+
+            if args.profile_command == "remove":
+                if args.apply:
+                    destination = remove_imported_profile(args.profile_id, args.library)
+                    report = {
+                        "profile_id": args.profile_id,
+                        "destination": str(destination),
+                        "dry_run": False,
+                        "removed": True,
+                    }
+                else:
+                    library = args.library if args.library else "~/.local/share/rice-manager/profiles"
+                    library_path = __import__("pathlib").Path(library).expanduser().absolute()
+                    destination = library_path / args.profile_id
+                    if not destination.is_dir() or destination.is_symlink():
+                        raise ProfileImportError(f"Imported profile does not exist as a real directory: {destination}")
+                    manifest_path = destination / "manifest.json"
+                    if manifest_path.is_symlink() or not manifest_path.is_file():
+                        raise ProfileImportError("Refusing to remove a library entry without a regular manifest.json.")
+                    manifest = load_manifest(manifest_path)
+                    if manifest.id != args.profile_id:
+                        raise ProfileImportError("Profile directory name does not match its manifest ID.")
+                    report = {
+                        "profile_id": manifest.id,
+                        "profile_name": manifest.name,
+                        "destination": str(destination),
+                        "dry_run": True,
+                        "removed": False,
+                    }
+                if args.json:
+                    print(json.dumps(report, indent=2))
+                elif args.apply:
+                    print(f"Imported profile removed: {report['profile_id']}")
+                else:
+                    print("Profile removal preview (no files changed):")
+                    print(f"  Profile: {report['profile_name']} ({report['profile_id']})")
+                    print(f"  Directory: {report['destination']}")
+                    print("\\nRun the same command with --apply only after reviewing this target.")
                 return
 
             if args.profile_command == "restore":
