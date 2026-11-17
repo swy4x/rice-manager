@@ -2,7 +2,7 @@
 
 A safety-first rice and dotfile profile manager for Arch Linux, starting with Hyprland and Quickshell.
 
-> **Status: early development.** Version 0.7 connects the Quickshell dashboard to the Python read-only preflight planner. Profile activation and GitHub importing are not implemented yet.
+> **Status: early development.** Version 0.8 adds a live Components workspace to the Quickshell dashboard, backed by the Python read-only preflight planner. Profile activation and GitHub importing are not implemented yet.
 
 ## Goals
 
@@ -67,7 +67,7 @@ The `profile plan` command is a dry-run preflight only. It checks user component
 
 ## Quickshell UI prototype
 
-The Quickshell dashboard reads the example manifest through the Python CLI and displays live read-only preflight results. It does not execute profile actions. Run it directly from the repository without installing or changing your Quickshell configuration:
+The Quickshell dashboard reads the example manifest through the repository virtual environment and displays live read-only preflight results. The Components workspace lists each manifest entry, its path, preflight status, and explanation. It does not execute profile actions. Run it directly from the repository without installing or changing your Quickshell configuration:
 
 ```bash
 qs -p ./ui
@@ -109,6 +109,7 @@ python -m unittest discover -s tests
 - [ ] Transactional profile activation
 - [x] Initial Quickshell UI prototype
 - [x] Connect GUI to Python core (read-only preflight)
+- [x] Live read-only Components workspace
 - [ ] Git repository importer
 - [ ] Dependency detection and optional install plans
 
