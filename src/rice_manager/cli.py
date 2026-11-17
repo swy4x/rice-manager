@@ -11,7 +11,7 @@ from .restore import RestoreError, restore_backup
 from .manifest import ManifestError, load_manifest, resolve_source
 from .planner import build_switch_plan
 from .profiles import ProfileDiscoveryError, discover_profiles
-from .profile_import import ProfileImportError, import_profile, preview_profile_import, remove_imported_profile
+from .profile_import import ProfileImportError, import_profile, preview_profile_import, preview_profile_removal, remove_imported_profile
 from .system import inspect_path, inspect_system
 
 
@@ -184,33 +184,12 @@ def main() -> None:
                 return
 
             if args.profile_command == "remove":
+                report = preview_profile_removal(args.profile_id, args.library)
                 if args.apply:
                     destination = remove_imported_profile(args.profile_id, args.library)
-                    report = {
-                        "profile_id": args.profile_id,
-                        "destination": str(destination),
-                        "dry_run": False,
-                        "removed": True,
-                    }
-                else:
-                    library = args.library if args.library else "~/.local/share/rice-manager/profiles"
-                    library_path = __import__("pathlib").Path(library).expanduser().absolute()
-                    destination = library_path / args.profile_id
-                    if not destination.is_dir() or destination.is_symlink():
-                        raise ProfileImportError(f"Imported profile does not exist as a real directory: {destination}")
-                    manifest_path = destination / "manifest.json"
-                    if manifest_path.is_symlink() or not manifest_path.is_file():
-                        raise ProfileImportError("Refusing to remove a library entry without a regular manifest.json.")
-                    manifest = load_manifest(manifest_path)
-                    if manifest.id != args.profile_id:
-                        raise ProfileImportError("Profile directory name does not match its manifest ID.")
-                    report = {
-                        "profile_id": manifest.id,
-                        "profile_name": manifest.name,
-                        "destination": str(destination),
-                        "dry_run": True,
-                        "removed": False,
-                    }
+                    report["destination"] = str(destination)
+                    report["dry_run"] = False
+                    report["removed"] = True
                 if args.json:
                     print(json.dumps(report, indent=2))
                 elif args.apply:
