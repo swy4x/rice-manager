@@ -2,7 +2,7 @@
 
 A safety-first rice and dotfile profile manager for Arch Linux, starting with Hyprland and Quickshell.
 
-> **Status: early development.** Version 0.11 adds clickable read-only profile details, including declared source paths, resolved targets, component metadata, and preflight status. Profile activation and GitHub importing are not implemented yet.
+> **Status: early development.** Version 0.12 adds a preview-first local profile importer. It validates manifests, inventories files, rejects symlinks, and requires an explicit apply flag. Profile activation and Git-based importing are not implemented yet.
 
 ## Goals
 
@@ -64,7 +64,7 @@ rice-manager profile restore /path/to/backup --apply
 
 When applying, existing destinations are copied to a timestamped `pre-restore-*` safety snapshot before replacement. Restore refuses destinations outside your home directory, symlink destinations, invalid metadata, and unsafe backup paths. System-wide configuration is not restored.
 
-The `profile plan` command is a dry-run preflight only. It checks user component paths, required components, declared file/directory types, and unsafe destinations. System-scoped and read-only components are skipped. It does not install profile files or switch the active desktop; profile payload storage and transactional activation are future work.
+The `profile plan` command is a dry-run preflight only. It checks user component paths, required components, declared file/directory types, and unsafe destinations. System-scoped and read-only components are skipped. It does not install profile files or switch the active desktop; transactional activation is future work.\n\nImport a local profile directory into Rice Manager's private library. Preview first; no files are written in preview mode:\n\n```bash\nrice-manager profile import /path/to/profile-directory\n```\n\nThe preview validates `manifest.json` and lists every regular file and its size. It rejects symlinks, special filesystem entries, source/library overlap, invalid manifests, and profile ID collisions. After reviewing the list, explicitly apply the import:\n\n```bash\nrice-manager profile import /path/to/profile-directory --apply\n```\n\nThe default library is `~/.local/share/rice-manager/profiles/<profile-id>/`. You can choose another library with `--library /path/to/library`. Import copies the profile package into that library only; it does not follow manifest source paths, modify `~/.config`, touch `/etc/xdg`, install dependencies, or activate the profile. Existing library entries are never overwritten.
 
 ## Quickshell UI prototype
 
@@ -113,7 +113,7 @@ python -m unittest discover -s tests
 - [x] Live read-only Components workspace
 - [x] Read-only Profiles workspace with multi-profile discovery
 - [x] Read-only profile details with component metadata and preflight status
-- [ ] Git repository importer
+- [x] Preview-first local profile directory importer (CLI)\n- [ ] Git repository importer
 - [ ] Dependency detection and optional install plans
 
 ## License
