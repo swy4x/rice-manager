@@ -6,7 +6,7 @@ import json
 import os
 import re
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 
@@ -23,6 +23,7 @@ class Component:
     scope: str
     required: bool = False
     read_only: bool = False
+    payload: str | None = None
 
 
 @dataclass(frozen=True)
@@ -110,7 +111,7 @@ def load_manifest(path: str | Path) -> Manifest:
 
     components: list[Component] = []
     seen: set[str] = set()
-    allowed = {"id", "name", "kind", "source", "scope", "required", "read_only"}
+    allowed = {"id", "name", "kind", "source", "scope", "required", "read_only", "payload"}
     for index, item in enumerate(entries):
         prefix = f"components[{index}]"
         if not isinstance(item, dict):
@@ -132,6 +133,14 @@ def load_manifest(path: str | Path) -> Manifest:
             if flag in item and not isinstance(item[flag], bool):
                 raise ManifestError(f"{prefix}.{flag} must be boolean.")
         resolve_source(item["source"])
+        payload = item.get("payload")
+        if payload is not None:
+            if not isinstance(payload, str) or not payload.strip():
+                raise ManifestError(f"{prefix}.payload must be a non-empty relative path.")
+            payload_path = PurePosixPath(payload)
+            if (payload_path.is_absolute() or "\\" in payload
+                    or any(part in {".", ".."} for part in payload_path.parts)):
+                raise ManifestError(f"{prefix}.payload must be a safe relative POSIX path.")
         components.append(Component(
             id=item["id"],
             name=item["name"],
@@ -140,6 +149,7 @@ def load_manifest(path: str | Path) -> Manifest:
             scope=item["scope"],
             required=item.get("required", False),
             read_only=item.get("read_only", False),
+            payload=payload,
         ))
 
     return Manifest(
