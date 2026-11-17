@@ -161,5 +161,47 @@ class ActivationTests(unittest.TestCase):
                 self.run_apply(home, profile, manifest, apply=True)
 
 
+    def test_rollback_refuses_symlinked_destination_parent(self):
+        import os
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            profile, manifest = self.make_profile(home)
+            (profile / "payload/hypr/zzz.conf").write_text(
+                "second file", encoding="utf-8"
+            )
+
+            destination = home / ".config" / "hypr"
+            destination.mkdir(parents=True)
+            original = destination / "hyprland.conf"
+            original.write_text("original", encoding="utf-8")
+
+            outside = home / "outside"
+            outside.mkdir()
+
+            real_replace = os.replace
+            calls = {"count": 0}
+
+            def change_parent_then_fail(source, target):
+                calls["count"] += 1
+                if calls["count"] == 2:
+                    detached = home / "detached"
+                    destination.rename(detached)
+                    destination.symlink_to(
+                        outside, target_is_directory=True
+                    )
+                    raise OSError("simulated installation failure")
+                return real_replace(source, target)
+
+            with patch(
+                "rice_manager.activation.os.replace",
+                side_effect=change_parent_then_fail,
+            ):
+                with self.assertRaises(ActivationError):
+                    self.run_apply(home, profile, manifest, apply=True)
+
+            self.assertTrue(destination.is_symlink())
+            self.assertFalse((outside / "hyprland.conf").exists())
+
 if __name__ == "__main__":
     unittest.main()

@@ -283,8 +283,8 @@ def apply_profile_payload(
         for item in reversed(installed):
             target = item["target"]
             try:
-                if target.is_symlink():
-                    raise OSError("destination became a symlink during rollback")
+                if _has_symlink(target, home):
+                    raise OSError("destination path contains a symlink during rollback")
                 if target.exists():
                     current = target.stat(follow_symlinks=False)
                     signature = (current.st_dev, current.st_ino, current.st_size, current.st_mtime_ns)
