@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+from pathlib import Path
 
 from . import __version__
 from .backup import BackupError, create_backup
@@ -241,7 +242,7 @@ def main() -> None:
 
             manifest = load_manifest(args.manifest)
             if args.profile_command == "inventory":
-                profile_directory = args.profile_dir or str(__import__("pathlib").Path(args.manifest).expanduser().parent)
+                profile_directory = args.profile_dir or str(Path(args.manifest).expanduser().parent)
                 report = build_payload_inventory(manifest, profile_directory)
                 if args.json:
                     print(json.dumps(report, indent=2))
@@ -252,7 +253,7 @@ def main() -> None:
                     for item in component["files"]:
                         print(f"    [{item['action']}] {item['path']}")
                 summary = report["summary"]
-                print("\\nADD: {ADD} | REPLACE: {REPLACE} | UNCHANGED: {UNCHANGED} | CONFLICT: {CONFLICT}".format(**summary))
+                print("\nADD: {ADD} | REPLACE: {REPLACE} | UNCHANGED: {UNCHANGED} | CONFLICT: {CONFLICT}".format(**summary))
                 print("Dry-run only: no files were created, copied, replaced, or deleted.")
                 return
 
