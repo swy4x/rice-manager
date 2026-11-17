@@ -138,8 +138,9 @@ def load_manifest(path: str | Path) -> Manifest:
             if not isinstance(payload, str) or not payload.strip():
                 raise ManifestError(f"{prefix}.payload must be a non-empty relative path.")
             payload_path = PurePosixPath(payload)
-            if (payload_path.is_absolute() or "\\" in payload
-                    or any(part in {".", ".."} for part in payload_path.parts)):
+            raw_parts = payload.split("/")
+            if (payload_path.is_absolute() or "\\" in payload or "\x00" in payload
+                    or any(part in {"", ".", ".."} for part in raw_parts)):
                 raise ManifestError(f"{prefix}.payload must be a safe relative POSIX path.")
         components.append(Component(
             id=item["id"],
