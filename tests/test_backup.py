@@ -48,6 +48,34 @@ class BackupTests(unittest.TestCase):
             with self.assertRaises(BackupError):
                 create_backup(self.make_manifest(missing, system), base / "backups")
 
+    def test_rejects_symlinked_backup_destination(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            source = base / "config" / "hypr"
+            source.mkdir(parents=True)
+            (source / "hyprland.conf").write_text("general {}")
+            system = base / "system"
+            system.mkdir()
+            real_backups = base / "real-backups"
+            real_backups.mkdir()
+            linked_backups = base / "linked-backups"
+            linked_backups.symlink_to(real_backups, target_is_directory=True)
+            with self.assertRaises(BackupError):
+                create_backup(self.make_manifest(source, system), linked_backups)
+
+    def test_rejects_symlinked_component_parent(self):
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            real_config = base / "real-config"
+            (real_config / "hypr").mkdir(parents=True)
+            (real_config / "hypr/hyprland.conf").write_text("general {}")
+            linked_config = base / ".config"
+            linked_config.symlink_to(real_config, target_is_directory=True)
+            system = base / "system"
+            system.mkdir()
+            with self.assertRaises(BackupError):
+                create_backup(self.make_manifest(linked_config / "hypr", system), base / "backups")
+
     def test_no_user_components_aborts(self):
         manifest = Manifest(
             id="system-only", name="System only", version="1", description="",
