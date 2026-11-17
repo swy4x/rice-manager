@@ -89,3 +89,42 @@ def import_profile(source: str | Path, library: str | Path | None = None) -> Pat
     except Exception:
         shutil.rmtree(staging, ignore_errors=True)
         raise
+
+def remove_imported_profile(
+    profile_id: str,
+    library: str | Path | None = None,
+) -> Path:
+    """Remove one validated profile directory from the private profile library."""
+    import re
+
+    if not isinstance(profile_id, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,47}", profile_id):
+        raise ProfileImportError("Profile ID must contain lowercase letters, numbers, and hyphens.")
+
+    library_path = Path(library).expanduser() if library else (
+        Path.home() / ".local" / "share" / "rice-manager" / "profiles"
+    )
+    library_path = library_path.absolute()
+    if library_path.is_symlink() or not library_path.is_dir():
+        raise ProfileImportError("Profile library must be an existing real directory.")
+
+    destination = library_path / profile_id
+    if destination.is_symlink() or not destination.is_dir():
+        raise ProfileImportError(f"Imported profile does not exist as a real directory: {destination}")
+
+    manifest_path = destination / "manifest.json"
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise ProfileImportError("Refusing to remove a library entry without a regular manifest.json.")
+
+    try:
+        manifest = load_manifest(manifest_path)
+    except ManifestError as exc:
+        raise ProfileImportError(f"Refusing to remove an invalid profile: {exc}") from exc
+    if manifest.id != profile_id:
+        raise ProfileImportError("Profile directory name does not match its manifest ID.")
+
+    try:
+        shutil.rmtree(destination)
+    except OSError as exc:
+        raise ProfileImportError(f"Could not remove imported profile: {exc}") from exc
+    return destination
+
