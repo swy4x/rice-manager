@@ -28,6 +28,10 @@ FloatingWindow {
     property string selectedProfileName: ""
     property var detailData: ({})
     property string detailError: ""
+    property string inventoryManifest: Quickshell.shellDir + "/../examples/caelestia/manifest.json"
+    property var inventoryData: ({})
+    property string inventoryError: ""
+    property bool inventoryLoading: false
     property string importSource: ""
     property string importError: ""
     property string pendingRemovalId: ""
@@ -45,6 +49,8 @@ FloatingWindow {
         libraryProcess.running = true
         if (currentPage === "Dependencies")
             dependencyProcess.running = true
+        if (currentPage === "Inventory")
+            inventoryProcess.running = true
         if (currentPage === "Profile Details" && selectedManifest.length > 0) {
             detailData = ({})
             detailError = ""
@@ -287,6 +293,46 @@ FloatingWindow {
     }
 
 
+
+    Process {
+        id: inventoryProcess
+        command: [
+            Quickshell.shellDir + "/../.venv/bin/rice-manager",
+            "profile", "inventory", root.inventoryManifest, "--json"
+        ]
+        running: false
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.inventoryData = JSON.parse(this.text)
+                    root.inventoryError = ""
+                    root.inventoryLoading = false
+                } catch (error) {
+                    root.inventoryError = String(error)
+                    root.inventoryLoading = false
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (this.text.trim().length > 0) {
+                    root.inventoryError = this.text.trim()
+                    root.inventoryLoading = false
+                }
+            }
+        }
+
+        onStarted: root.inventoryLoading = true
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0 && root.inventoryError.length === 0) {
+                root.inventoryError = "Payload inventory failed."
+                root.inventoryLoading = false
+            }
+        }
+    }
+
     Process {
         id: importProcess
         command: [
@@ -380,7 +426,7 @@ FloatingWindow {
                         }
 
                         Repeater {
-                            model: ["Overview", "Profiles", "Import", "Components", "Dependencies", "Backups", "Settings"]
+                            model: ["Overview", "Profiles", "Import", "Components", "Inventory", "Dependencies", "Backups", "Settings"]
 
                             delegate: Rectangle {
                                 required property string modelData
@@ -404,6 +450,7 @@ FloatingWindow {
                                                 "Profiles": "▤",
                                                 "Import": "⇧",
                                                 "Components": "◈",
+                                                "Inventory": "▦",
                                                 "Dependencies": "⬡",
                                                 "Backups": "⟲",
                                                 "Settings": "⚙"
@@ -1441,6 +1488,234 @@ FloatingWindow {
                     }
 
 
+
+                    Column {
+                        visible: root.currentPage === "Inventory"
+                        width: parent.width
+                        spacing: 14
+
+                        Text {
+                            text: "PROFILE PAYLOAD PREVIEW"
+                            color: root.accent
+                            font.pixelSize: 10
+                            font.bold: true
+                            font.letterSpacing: 1.3
+                        }
+
+                        Text {
+                            width: parent.width
+                            text: "Compare profile payload files with their destinations. This workspace is strictly read-only."
+                            color: root.muted
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 46
+                            radius: 7
+                            color: "#101923"
+                            border.width: 1
+                            border.color: root.border
+                            TextInput {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                verticalAlignment: TextInput.AlignVCenter
+                                color: "#e7eff7"
+                                font.pixelSize: 11
+                                selectByMouse: true
+                                text: root.inventoryManifest
+                                onTextChanged: {
+                                    root.inventoryManifest = text
+                                    root.inventoryData = ({})
+                                    root.inventoryError = ""
+                                }
+                                clip: true
+                            }
+                        }
+
+                        Row {
+                            spacing: 10
+                            Rectangle {
+                                width: 124
+                                height: 36
+                                radius: 7
+                                color: "#1a2b38"
+                                border.width: 1
+                                border.color: "#315064"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: root.inventoryLoading ? "SCANNING…" : "↻ PREVIEW"
+                                    color: root.accent
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: root.inventoryManifest.trim().length > 0 && !root.inventoryLoading
+                                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    onClicked: {
+                                        root.inventoryData = ({})
+                                        root.inventoryError = ""
+                                        inventoryProcess.running = true
+                                    }
+                                }
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "DRY-RUN ONLY  /  APPLY NOT AVAILABLE"
+                                color: "#f0c674"
+                                font.pixelSize: 9
+                                font.bold: true
+                            }
+                        }
+
+                        Text {
+                            visible: root.inventoryError.length > 0
+                            width: parent.width
+                            text: root.inventoryError
+                            color: "#ff9aa2"
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Text {
+                            visible: root.inventoryData.profile !== undefined
+                            text: root.inventoryData.profile
+                                ? root.inventoryData.profile.name + "  /  " + root.inventoryData.profile.id
+                                : ""
+                            color: "#eaf4fb"
+                            font.pixelSize: 14
+                            font.bold: true
+                        }
+
+                        Rectangle {
+                            visible: root.inventoryData.summary !== undefined
+                            width: parent.width
+                            height: 82
+                            radius: 9
+                            color: root.panel
+                            border.width: 1
+                            border.color: root.border
+                            Row {
+                                anchors.fill: parent
+                                anchors.margins: 13
+                                spacing: 22
+                                Repeater {
+                                    model: [
+                                        { label: "ADD", key: "ADD", color: "#8fe0b8" },
+                                        { label: "REPLACE", key: "REPLACE", color: "#f0c674" },
+                                        { label: "UNCHANGED", key: "UNCHANGED", color: root.accent },
+                                        { label: "CONFLICT", key: "CONFLICT", color: "#ff7b86" }
+                                    ]
+                                    delegate: Column {
+                                        required property var modelData
+                                        spacing: 5
+                                        Text { text: modelData.label; color: root.muted; font.pixelSize: 8; font.bold: true }
+                                        Text {
+                                            text: root.inventoryData.summary ? String(root.inventoryData.summary[modelData.key] || 0) : "0"
+                                            color: modelData.color
+                                            font.pixelSize: 22
+                                            font.bold: true
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Repeater {
+                            model: root.inventoryData.components ? root.inventoryData.components : []
+                            delegate: Rectangle {
+                                required property var modelData
+                                width: parent.width
+                                height: 104 + (modelData.files ? modelData.files.length * 48 : 0)
+                                radius: 9
+                                color: root.panel
+                                border.width: 1
+                                border.color: modelData.status === "BLOCKED" || modelData.status === "CONFLICT" ? "#684044" : root.border
+
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 13
+                                    spacing: 6
+                                    Row {
+                                        width: parent.width
+                                        Text {
+                                            width: parent.width - 132
+                                            text: modelData.name
+                                            color: "#eaf4fb"
+                                            font.pixelSize: 12
+                                            font.bold: true
+                                            elide: Text.ElideRight
+                                        }
+                                        Text {
+                                            text: modelData.status
+                                            color: modelData.status === "BLOCKED" || modelData.status === "CONFLICT" ? "#ff7b86" : (modelData.status === "UNCHANGED" || modelData.status === "SKIPPED_PROTECTED" ? "#8fe0b8" : "#f0c674")
+                                            font.pixelSize: 9
+                                            font.bold: true
+                                        }
+                                    }
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.destination
+                                        color: root.muted
+                                        font.pixelSize: 9
+                                        wrapMode: Text.WrapAnywhere
+                                    }
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.detail || ""
+                                        color: "#718092"
+                                        font.pixelSize: 9
+                                        wrapMode: Text.WordWrap
+                                    }
+                                    Repeater {
+                                        model: modelData.files ? modelData.files : []
+                                        delegate: Rectangle {
+                                            required property var modelData
+                                            width: parent.width
+                                            height: 38
+                                            radius: 6
+                                            color: "#0e151d"
+                                            border.width: 1
+                                            border.color: root.border
+                                            Row {
+                                                anchors.fill: parent
+                                                anchors.leftMargin: 10
+                                                anchors.rightMargin: 10
+                                                Text {
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    width: parent.width - 100
+                                                    text: modelData.path
+                                                    color: "#e7eff7"
+                                                    font.pixelSize: 10
+                                                    elide: Text.ElideMiddle
+                                                }
+                                                Item { width: 1; height: 1 }
+                                                Text {
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    text: modelData.action
+                                                    color: modelData.action === "CONFLICT" ? "#ff7b86" : (modelData.action === "UNCHANGED" ? "#8fe0b8" : "#f0c674")
+                                                    font.pixelSize: 9
+                                                    font.bold: true
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            visible: root.inventoryData.dry_run === true
+                            text: "Dry-run only: no files were created, copied, replaced, or deleted. Extra destination files are left untouched."
+                            color: "#718092"
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+
                     Column {
                         visible: root.currentPage === "Dependencies"
                         width: parent.width
@@ -1639,7 +1914,7 @@ FloatingWindow {
                     }
 
                     Column {
-                        visible: root.currentPage !== "Overview" && root.currentPage !== "Dependencies" && root.currentPage !== "Components" && root.currentPage !== "Profiles" && root.currentPage !== "Import" && root.currentPage !== "Profile Details"
+                        visible: root.currentPage !== "Overview" && root.currentPage !== "Dependencies" && root.currentPage !== "Inventory" && root.currentPage !== "Components" && root.currentPage !== "Profiles" && root.currentPage !== "Import" && root.currentPage !== "Profile Details"
                         width: parent.width
                         spacing: 12
 
