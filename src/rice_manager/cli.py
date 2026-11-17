@@ -256,7 +256,12 @@ def main() -> None:
                 if args.json:
                     print(json.dumps(report, indent=2))
                     return
-                title = "Payload installed:" if args.apply else "Payload apply preview (no files changed):"
+                if args.apply and report["applied"]:
+                    title = "Payload installed:"
+                elif args.apply:
+                    title = "No changes required:"
+                else:
+                    title = "Payload apply preview (no files changed):"
                 print(f"{title} {manifest.name} ({manifest.id})")
                 for item in report["files"]:
                     print(f"  [{item['action']}] {item['component']}: {item['destination']}")
