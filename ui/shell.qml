@@ -486,7 +486,7 @@ FloatingWindow {
                                 anchors.bottom: parent.bottom
                                 anchors.rightMargin: 22
                                 anchors.bottomMargin: 14
-                                text: "RM  /  0.13"
+                                text: "RM  /  0.14"
                                 color: "#476174"
                                 font.pixelSize: 11
                                 font.bold: true
