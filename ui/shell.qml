@@ -895,14 +895,14 @@ FloatingWindow {
                                     }
                                     Text {
                                         width: parent.width
-                                        text: "SOURCE  " + modelData.source
+                                        text: "DECLARED PATH  " + modelData.source
                                         color: "#b6c4d2"
                                         font.pixelSize: 10
                                         wrapMode: Text.WrapAnywhere
                                     }
                                     Text {
                                         width: parent.width
-                                        text: "TARGET  " + modelData.path
+                                        text: "RESOLVED PATH  " + modelData.path
                                         color: "#b6c4d2"
                                         font.pixelSize: 10
                                         wrapMode: Text.WrapAnywhere
