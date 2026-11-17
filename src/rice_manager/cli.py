@@ -8,6 +8,7 @@ from pathlib import Path
 
 from . import __version__
 from .backup import BackupError, create_backup
+from .activation import ActivationError, apply_profile_payload
 from .dependencies import check_dependencies
 from .restore import RestoreError, restore_backup
 from .manifest import ManifestError, load_manifest, resolve_source
@@ -47,6 +48,14 @@ def build_parser() -> argparse.ArgumentParser:
             sub.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
         if name == "inventory":
             sub.add_argument("--profile-dir", help="Profile directory (default: manifest directory).")
+
+    apply_parser = profile_commands.add_parser(
+        "apply", help="Preview or explicitly apply a profile payload transaction."
+    )
+    apply_parser.add_argument("manifest", help="Path to a profile manifest JSON file.")
+    apply_parser.add_argument("--profile-dir", help="Profile directory (default: manifest directory).")
+    apply_parser.add_argument("--apply", action="store_true", help="Install the reviewed payload files.")
+    apply_parser.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
 
     list_parser = profile_commands.add_parser(
         "list", help="Discover profile manifests in a directory (read-only)."
@@ -241,6 +250,25 @@ def main() -> None:
                 return
 
             manifest = load_manifest(args.manifest)
+            if args.profile_command == "apply":
+                profile_directory = args.profile_dir or str(Path(args.manifest).expanduser().parent)
+                report = apply_profile_payload(manifest, profile_directory, apply=args.apply)
+                if args.json:
+                    print(json.dumps(report, indent=2))
+                    return
+                title = "Payload installed:" if args.apply else "Payload apply preview (no files changed):"
+                print(f"{title} {manifest.name} ({manifest.id})")
+                for item in report["files"]:
+                    print(f"  [{item['action']}] {item['component']}: {item['destination']}")
+                summary = report["summary"]
+                print(f"\\nADD: {summary['ADD']} | REPLACE: {summary['REPLACE']} | UNCHANGED: {summary['UNCHANGED']}")
+                if args.apply:
+                    print(f"Safety snapshot: {report.get('safety_backup', 'not needed')}")
+                    print("Extra destination files were left untouched.")
+                else:
+                    print("\\nNo files were changed. Review this list, then rerun with --apply to install.")
+                return
+
             if args.profile_command == "inventory":
                 profile_directory = args.profile_dir or str(Path(args.manifest).expanduser().parent)
                 report = build_payload_inventory(manifest, profile_directory)
@@ -313,7 +341,7 @@ def main() -> None:
                 print("Only writable user components were included; system/read-only components were skipped.")
                 return
 
-        except (ManifestError, BackupError, RestoreError, ProfileDiscoveryError, ProfileImportError, PayloadInventoryError) as exc:
+        except (ManifestError, BackupError, RestoreError, ActivationError, ProfileDiscoveryError, ProfileImportError, PayloadInventoryError) as exc:
             raise SystemExit(f"Rice Manager error: {exc}") from exc
 
 
