@@ -17,6 +17,9 @@ FloatingWindow {
     property color panel: "#121923"
     property color border: "#243140"
     property var planData: ({})
+    property var dependencyData: ({})
+    property string dependencyError: ""
+    property bool dependencyLoading: false
     property var profilesData: ({})
     property var libraryData: ({})
     property string libraryError: ""
@@ -40,6 +43,8 @@ FloatingWindow {
         planProcess.running = true
         profilesProcess.running = true
         libraryProcess.running = true
+        if (currentPage === "Dependencies")
+            dependencyProcess.running = true
         if (currentPage === "Profile Details" && selectedManifest.length > 0) {
             detailData = ({})
             detailError = ""
@@ -157,6 +162,48 @@ FloatingWindow {
             onStreamFinished: {
                 if (this.text.trim().length > 0)
                     root.libraryError = this.text.trim()
+            }
+        }
+    }
+
+
+    Process {
+        id: dependencyProcess
+        command: [
+            Quickshell.shellDir + "/../.venv/bin/rice-manager",
+            "profile", "deps",
+            Quickshell.shellDir + "/../examples/caelestia/manifest.json",
+            "--json"
+        ]
+        running: true
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.dependencyData = JSON.parse(this.text)
+                    root.dependencyError = ""
+                    root.dependencyLoading = false
+                } catch (error) {
+                    root.dependencyError = String(error)
+                    root.dependencyLoading = false
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (this.text.trim().length > 0) {
+                    root.dependencyError = this.text.trim()
+                    root.dependencyLoading = false
+                }
+            }
+        }
+
+        onStarted: root.dependencyLoading = true
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0 && root.dependencyError.length === 0) {
+                root.dependencyError = "Dependency check failed."
+                root.dependencyLoading = false
             }
         }
     }
@@ -331,7 +378,7 @@ FloatingWindow {
                         }
 
                         Repeater {
-                            model: ["Overview", "Profiles", "Import", "Components", "Backups", "Settings"]
+                            model: ["Overview", "Profiles", "Import", "Components", "Dependencies", "Backups", "Settings"]
 
                             delegate: Rectangle {
                                 required property string modelData
@@ -355,6 +402,7 @@ FloatingWindow {
                                                 "Profiles": "▤",
                                                 "Import": "⇧",
                                                 "Components": "◈",
+                                                "Dependencies": "⬡",
                                                 "Backups": "⟲",
                                                 "Settings": "⚙"
                                             }
@@ -1390,8 +1438,206 @@ FloatingWindow {
                         }
                     }
 
+
                     Column {
-                        visible: root.currentPage !== "Overview" && root.currentPage !== "Components" && root.currentPage !== "Profiles" && root.currentPage !== "Import" && root.currentPage !== "Profile Details"
+                        visible: root.currentPage === "Dependencies"
+                        width: parent.width
+                        spacing: 14
+
+                        Row {
+                            width: parent.width
+                            spacing: 12
+
+                            Column {
+                                spacing: 4
+                                Text {
+                                    text: "PACKAGE DEPENDENCIES"
+                                    color: root.accent
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    font.letterSpacing: 1.3
+                                }
+                                Text {
+                                    text: root.dependencyData.profile
+                                        ? root.dependencyData.profile.name + "  /  " + root.dependencyData.dependencies.length + " declared packages"
+                                        : "Checking the selected profile manifest…"
+                                    color: root.muted
+                                    font.pixelSize: 11
+                                }
+                            }
+
+                            Item { width: 1; height: 1 }
+
+                            Rectangle {
+                                width: 92
+                                height: 30
+                                radius: 6
+                                color: "#18232e"
+                                border.width: 1
+                                border.color: root.border
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: root.dependencyLoading ? "CHECKING…" : "↻ REFRESH"
+                                    color: root.accent
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: !root.dependencyLoading
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: {
+                                        root.dependencyError = ""
+                                        root.dependencyLoading = true
+                                        dependencyProcess.running = true
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 100
+                            radius: 10
+                            color: root.panel
+                            border.width: 1
+                            border.color: root.border
+                            Row {
+                                anchors.fill: parent
+                                anchors.margins: 16
+                                spacing: 26
+                                Column {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 5
+                                    Text { text: "INSTALLED"; color: root.muted; font.pixelSize: 9; font.bold: true }
+                                    Text {
+                                        text: root.dependencyData.installed ? String(root.dependencyData.installed.length).padStart(2, "0") : "00"
+                                        color: "#8fe0b8"; font.pixelSize: 25; font.bold: true
+                                    }
+                                }
+                                Column {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 5
+                                    Text { text: "MISSING"; color: root.muted; font.pixelSize: 9; font.bold: true }
+                                    Text {
+                                        text: root.dependencyData.missing ? String(root.dependencyData.missing.length).padStart(2, "0") : "00"
+                                        color: root.dependencyData.missing && root.dependencyData.missing.length > 0 ? "#ff7b86" : "#8fe0b8"
+                                        font.pixelSize: 25; font.bold: true
+                                    }
+                                }
+                                Column {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 5
+                                    Text { text: "CHECK STATUS"; color: root.muted; font.pixelSize: 9; font.bold: true }
+                                    Text {
+                                        text: root.dependencyData.status ? root.dependencyData.status.toUpperCase() : "WAITING"
+                                        color: root.dependencyData.status === "checked" || root.dependencyData.status === "not-required" ? "#8fe0b8" : "#f0c674"
+                                        font.pixelSize: 12; font.bold: true
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            visible: root.dependencyError.length > 0
+                            width: parent.width
+                            text: root.dependencyError
+                            color: "#ff9aa2"
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Text {
+                            visible: root.dependencyData.status === "not-required"
+                            width: parent.width
+                            text: "No package dependencies are declared in this profile. Add package names to the manifest's dependencies array to track them here."
+                            color: root.muted
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Text {
+                            visible: root.dependencyData.status === "unavailable"
+                            width: parent.width
+                            text: "Pacman could not be queried. Package states are unverified; no changes were made."
+                            color: "#f0c674"
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Repeater {
+                            model: root.dependencyData.dependencies ? root.dependencyData.dependencies : []
+                            delegate: Rectangle {
+                                required property var modelData
+                                width: parent.width
+                                height: 54
+                                radius: 8
+                                color: root.panel
+                                border.width: 1
+                                border.color: modelData.status === "installed" ? "#285647" : (modelData.status === "missing" ? "#684044" : root.border)
+                                Row {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 15
+                                    anchors.rightMargin: 15
+                                    spacing: 10
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: modelData.name
+                                        color: "#eaf4fb"
+                                        font.pixelSize: 12
+                                        font.bold: true
+                                    }
+                                    Item { width: 1; height: 1 }
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: modelData.status.toUpperCase()
+                                        color: modelData.status === "installed" ? "#8fe0b8" : (modelData.status === "missing" ? "#ff7b86" : "#f0c674")
+                                        font.pixelSize: 9
+                                        font.bold: true
+                                    }
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            visible: root.dependencyData.install_command !== null && root.dependencyData.install_command !== undefined
+                            width: parent.width
+                            height: 104
+                            radius: 9
+                            color: "#111d28"
+                            border.width: 1
+                            border.color: "#684044"
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 14
+                                spacing: 8
+                                Text {
+                                    text: "SUGGESTED COMMAND  /  NOT EXECUTED"
+                                    color: "#f0c674"
+                                    font.pixelSize: 9
+                                    font.bold: true
+                                    font.letterSpacing: 1
+                                }
+                                Text {
+                                    width: parent.width
+                                    text: root.dependencyData.install_command || ""
+                                    color: "#e7eff7"
+                                    font.pixelSize: 11
+                                    wrapMode: Text.WrapAnywhere
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "Read-only pacman query. Rice Manager never installs packages or runs the suggested command. Review and execute any package installation yourself."
+                            color: "#718092"
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+
+                    Column {
+                        visible: root.currentPage !== "Overview" && root.currentPage !== "Dependencies" && root.currentPage !== "Components" && root.currentPage !== "Profiles" && root.currentPage !== "Import" && root.currentPage !== "Profile Details"
                         width: parent.width
                         spacing: 12
 
