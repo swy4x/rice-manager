@@ -111,8 +111,9 @@ def apply_profile_payload(
             })
 
     targets = [item["target"] for item in operations]
-    for index, target in enumerate(targets):
-        for other in targets[index + 1:]:
+    resolved_targets = [target.resolve(strict=False) for target in targets]
+    for index, target in enumerate(resolved_targets):
+        for other in resolved_targets[index + 1:]:
             if target == other or target in other.parents or other in target.parents:
                 raise ActivationError("Payload entries contain overlapping destination paths.")
     report = {
