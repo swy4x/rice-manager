@@ -198,7 +198,7 @@ def main() -> None:
                     print("Profile removal preview (no files changed):")
                     print(f"  Profile: {report['profile_name']} ({report['profile_id']})")
                     print(f"  Directory: {report['destination']}")
-                    print("\\nRun the same command with --apply only after reviewing this target.")
+                    print("\nRun the same command with --apply only after reviewing this target.")
                 return
 
             if args.profile_command == "restore":
