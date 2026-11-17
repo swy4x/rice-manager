@@ -1518,13 +1518,20 @@ FloatingWindow {
                             border.width: 1
                             border.color: root.border
                             TextInput {
+                                id: inventoryManifestInput
                                 anchors.fill: parent
                                 anchors.leftMargin: 12
                                 anchors.rightMargin: 12
+                                z: 2
+                                enabled: true
+                                readOnly: false
+                                focus: root.currentPage === "Inventory"
+                                activeFocusOnPress: true
                                 verticalAlignment: TextInput.AlignVCenter
                                 color: "#e7eff7"
                                 font.pixelSize: 11
                                 selectByMouse: true
+                                cursorVisible: activeFocus
                                 text: root.inventoryManifest
                                 onTextChanged: {
                                     root.inventoryManifest = text
