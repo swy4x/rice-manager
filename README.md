@@ -2,7 +2,7 @@
 
 A safety-first rice and dotfile profile manager for Arch Linux, starting with Hyprland and Quickshell.
 
-> **Status: early development.** Version 0.16 adds optional, explicit package dependency declarations and a read-only pacman check. Package installation and profile activation are not implemented.
+> **Status: early development.** Version 0.17 adds a GUI workspace for read-only package dependency checks. Package installation and profile activation are not implemented.
 
 ## Goals
 
@@ -106,7 +106,7 @@ Removal is restricted to a real profile directory directly inside the selected l
 
 ## Quickshell UI prototype
 
-The Quickshell dashboard reads manifests through the repository virtual environment and displays live read-only preflight results. The Profiles workspace discovers example profiles under `examples/` and separately lists imported profiles from `~/.local/share/rice-manager/profiles/`. Both lists validate manifests and expose read-only profile details. Select a valid profile to open its details, including each component's declared source, resolved target path, type, scope, required/read-only flags, and current preflight status. Invalid manifests are listed with their validation error. The Components workspace lists each manifest entry, its path, preflight status, and explanation. The Import workspace accepts a local profile directory, previews its validated manifest and file inventory, and exposes a separate Apply Import action only after a successful preview. Imported files go into the private Rice Manager profile library; they are not installed or activated. Run it directly from the repository without installing or changing your Quickshell configuration:
+The Quickshell dashboard reads manifests through the repository virtual environment and displays live read-only preflight results. The Profiles workspace discovers example profiles under `examples/` and separately lists imported profiles from `~/.local/share/rice-manager/profiles/`. Both lists validate manifests and expose read-only profile details. Select a valid profile to open its details, including each component's declared source, resolved target path, type, scope, required/read-only flags, and current preflight status. Invalid manifests are listed with their validation error. The Components workspace lists each manifest entry, its path, preflight status, and explanation. The Dependencies workspace checks declared package names against `pacman -Q`, shows installed/missing/unverified states, and displays a suggested install command when packages are missing; it never runs that command. The Import workspace accepts a local profile directory, previews its validated manifest and file inventory, and exposes a separate Apply Import action only after a successful preview. Imported files go into the private Rice Manager profile library; they are not installed or activated. Run it directly from the repository without installing or changing your Quickshell configuration:
 
 ```bash
 qs -p ./ui
@@ -165,6 +165,7 @@ python -m unittest discover -s tests
 - [x] Preview-first removal of imported profiles (CLI and GUI)
 - [x] Refresh imported profile library from the GUI
 - [x] Explicit package dependency declarations and read-only pacman checks
+- [x] Read-only Dependencies workspace in the Quickshell GUI
 - [ ] Git repository importer
 - [ ] Optional dependency installation workflow (explicit opt-in, future work)
 
