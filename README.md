@@ -2,7 +2,7 @@
 
 A safety-first rice and dotfile profile manager for Arch Linux, starting with Hyprland and Quickshell.
 
-> **Status: early development.** The v0.18 development line adds read-only, file-level profile payload inventory. Package installation and profile activation are not implemented.
+> **Status: early development.** The v0.19 development line adds an explicit, preview-first transactional payload installer. Package installation and desktop process/session management are not implemented.
 
 ## Goals
 
@@ -52,6 +52,20 @@ rice-manager profile inventory examples/caelestia/manifest.json --json
 
 The inventory command reads payload files relative to the profile directory and compares them with the declared user destinations. It reports `ADD`, `REPLACE`, `UNCHANGED`, and `CONFLICT` per file. Missing payloads remain compatible with older manifests; system-scoped and read-only components are skipped. Symlinked or unsafe payload/destination paths are blocked. Extra destination files are left alone: inventory never deletes, copies, or replaces files.
 
+Preview installation of a profile payload (read-only by default):
+
+```bash
+rice-manager profile apply examples/caelestia/manifest.json
+```
+
+Review the file-level ADD and REPLACE list. Apply only with the explicit flag:
+
+```bash
+rice-manager profile apply examples/caelestia/manifest.json --apply
+```
+
+The apply engine re-runs the inventory before writing, refuses any blocked/conflicting component, and only installs declared regular payload files for user-scoped writable components. Each changed file is staged beside its destination and atomically replaced. Existing files being replaced are copied into a timestamped `pre-apply-*` safety snapshot under `~/.local/share/rice-manager/backups`. If an installation step fails, already-installed files are rolled back from that snapshot. Extra destination files are never deleted. System-scoped and read-only components are never written. This command does not restart Hyprland, Quickshell, or other desktop processes.
+
 Check explicitly declared package dependencies:
 
 ```bash
@@ -83,7 +97,7 @@ rice-manager profile restore /path/to/backup --apply
 
 When applying, existing destinations are copied to a timestamped `pre-restore-*` safety snapshot before replacement. Restore refuses destinations outside your home directory, symlink destinations, invalid metadata, and unsafe backup paths. System-wide configuration is not restored.
 
-The `profile plan` command is a dry-run preflight only. It checks user component paths, required components, declared file/directory types, and unsafe destinations. System-scoped and read-only components are skipped. It does not install profile files or switch the active desktop; transactional activation is future work.
+The `profile plan` command is a dry-run preflight only. It checks user component paths, required components, declared file/directory types, and unsafe destinations. System-scoped and read-only components are skipped. The separate `profile apply` command installs only declared payload files after an explicit `--apply`; it does not restart desktop processes or change system-scoped configuration.
 
 Import a local profile directory into Rice Manager's private library. Preview first; no files are written in preview mode:
 
@@ -164,7 +178,7 @@ python -m unittest discover -s tests
 - [x] Explicit user-component backup engine
 - [x] Preview-first restore engine
 - [x] Read-only profile activation preflight planner
-- [ ] Transactional profile activation
+- [x] Explicit preview-first transactional payload installation (file-level; no session restart)
 - [x] Initial Quickshell UI prototype
 - [x] Connect GUI to Python core (read-only preflight)
 - [x] Live read-only Components workspace
