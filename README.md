@@ -2,7 +2,7 @@
 
 A safety-first rice and dotfile profile manager for Arch Linux, starting with Hyprland and Quickshell.
 
-> **Status: early development.** Version 0.10 adds read-only profile discovery across profile subdirectories, including manifest validation and preflight summaries in the Profiles workspace. Profile activation and GitHub importing are not implemented yet.
+> **Status: early development.** Version 0.11 adds clickable read-only profile details, including declared source paths, resolved targets, component metadata, and preflight status. Profile activation and GitHub importing are not implemented yet.
 
 ## Goals
 
@@ -68,7 +68,7 @@ The `profile plan` command is a dry-run preflight only. It checks user component
 
 ## Quickshell UI prototype
 
-The Quickshell dashboard reads the example manifest through the repository virtual environment and displays live read-only preflight results. The Profiles workspace discovers immediate child folders containing `manifest.json` under `examples/`, validates each manifest, and shows profile identity, component totals, and read-only preflight summaries. Invalid manifests are listed with their validation error. The Components workspace lists each manifest entry, its path, preflight status, and explanation. It does not execute profile actions. Run it directly from the repository without installing or changing your Quickshell configuration:
+The Quickshell dashboard reads manifests through the repository virtual environment and displays live read-only preflight results. The Profiles workspace discovers immediate child folders containing `manifest.json` under `examples/`, validates each manifest, and shows profile identity, component totals, and read-only preflight summaries. Select a valid profile to open its details, including each component's declared source, resolved target path, type, scope, required/read-only flags, and current preflight status. Invalid manifests are listed with their validation error. The Components workspace lists each manifest entry, its path, preflight status, and explanation. It does not execute profile actions. Run it directly from the repository without installing or changing your Quickshell configuration:
 
 ```bash
 qs -p ./ui
@@ -112,6 +112,7 @@ python -m unittest discover -s tests
 - [x] Connect GUI to Python core (read-only preflight)
 - [x] Live read-only Components workspace
 - [x] Read-only Profiles workspace with multi-profile discovery
+- [x] Read-only profile details with component metadata and preflight status
 - [ ] Git repository importer
 - [ ] Dependency detection and optional install plans
 
