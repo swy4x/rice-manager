@@ -63,23 +63,30 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _plan_json(plan) -> dict:
+def _plan_json(plan, manifest) -> dict:
     blocked_count = sum(item.status.startswith("blocked-") for item in plan.items)
     return {
         "schema_version": 1,
         "profile": {
             "id": plan.profile_id,
             "name": plan.profile_name,
+            "version": manifest.version,
+            "description": manifest.description,
         },
         "items": [
             {
                 "component_id": item.component_id,
                 "name": item.name,
+                "kind": component.kind,
+                "source": component.source,
                 "path": str(item.path),
+                "scope": component.scope,
+                "required": component.required,
+                "read_only": component.read_only,
                 "status": item.status,
                 "detail": item.detail,
             }
-            for item in plan.items
+            for item, component in zip(plan.items, manifest.components)
         ],
         "summary": {
             "ready": plan.ready_count,
@@ -163,7 +170,7 @@ def main() -> None:
             if args.profile_command == "plan":
                 plan = build_switch_plan(manifest)
                 if args.json:
-                    print(json.dumps(_plan_json(plan), indent=2))
+                    print(json.dumps(_plan_json(plan, manifest), indent=2))
                     return
 
                 print(f"Switch preflight: {plan.profile_name} ({plan.profile_id})")
