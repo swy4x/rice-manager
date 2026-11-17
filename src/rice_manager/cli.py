@@ -11,6 +11,7 @@ from .dependencies import check_dependencies
 from .restore import RestoreError, restore_backup
 from .manifest import ManifestError, load_manifest, resolve_source
 from .planner import build_switch_plan
+from .payload_inventory import PayloadInventoryError, build_payload_inventory
 from .profiles import ProfileDiscoveryError, discover_profiles
 from .profile_import import ProfileImportError, import_profile, preview_profile_import, preview_profile_removal, remove_imported_profile
 from .system import inspect_path, inspect_system
@@ -37,11 +38,14 @@ def build_parser() -> argparse.ArgumentParser:
         ("inspect", "Inspect profile component paths (read-only)."),
         ("plan", "Preview profile activation prerequisites (read-only)."),
         ("deps", "Check declared package dependencies (read-only)."),
+        ("inventory", "Compare profile payload files with destinations (read-only)."),
     ):
         sub = profile_commands.add_parser(name, help=help_text)
         sub.add_argument("manifest", help="Path to a profile manifest JSON file.")
-        if name in {"plan", "deps"}:
+        if name in {"plan", "deps", "inventory"}:
             sub.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
+        if name == "inventory":
+            sub.add_argument("--profile-dir", help="Profile directory (default: manifest directory).")
 
     list_parser = profile_commands.add_parser(
         "list", help="Discover profile manifests in a directory (read-only)."
@@ -236,6 +240,22 @@ def main() -> None:
                 return
 
             manifest = load_manifest(args.manifest)
+            if args.profile_command == "inventory":
+                profile_directory = args.profile_dir or str(__import__("pathlib").Path(args.manifest).expanduser().parent)
+                report = build_payload_inventory(manifest, profile_directory)
+                if args.json:
+                    print(json.dumps(report, indent=2))
+                    return
+                print(f"Payload inventory: {manifest.name} ({manifest.id})")
+                for component in report["components"]:
+                    print(f"  [{component['status']}] {component['name']}: {component['destination']}")
+                    for item in component["files"]:
+                        print(f"    [{item['action']}] {item['path']}")
+                summary = report["summary"]
+                print("\\nADD: {ADD} | REPLACE: {REPLACE} | UNCHANGED: {UNCHANGED} | CONFLICT: {CONFLICT}".format(**summary))
+                print("Dry-run only: no files were created, copied, replaced, or deleted.")
+                return
+
             if args.profile_command == "deps":
                 report = check_dependencies(manifest)
                 if args.json:
@@ -292,7 +312,7 @@ def main() -> None:
                 print("Only writable user components were included; system/read-only components were skipped.")
                 return
 
-        except (ManifestError, BackupError, RestoreError, ProfileDiscoveryError, ProfileImportError) as exc:
+        except (ManifestError, BackupError, RestoreError, ProfileDiscoveryError, ProfileImportError, PayloadInventoryError) as exc:
             raise SystemExit(f"Rice Manager error: {exc}") from exc
 
 
