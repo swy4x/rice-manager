@@ -23,6 +23,10 @@ FloatingWindow {
     property string selectedProfileName: ""
     property var detailData: ({})
     property string detailError: ""
+    property string importSource: ""
+    property string importError: ""
+    property var importPreview: ({})
+    property bool importApplyRequested: false
     property string backendStatus: "LOADING"
     property string backendError: ""
 
@@ -157,6 +161,44 @@ FloatingWindow {
         }
     }
 
+
+    Process {
+        id: importProcess
+        command: [
+            Quickshell.shellDir + "/../.venv/bin/rice-manager",
+            "profile", "import", root.importSource,
+            "--json"
+        ].concat(root.importApplyRequested ? ["--apply"] : [])
+        running: false
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.importPreview = JSON.parse(this.text)
+                    root.importError = ""
+                    if (!root.importApplyRequested)
+                        root.importError = "Preview ready. Review the file list before applying."
+                    else {
+                        root.importError = "Import completed successfully."
+                        root.importApplyRequested = false
+                        root.refreshPlan()
+                    }
+                } catch (error) {
+                    root.importError = String(error)
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (this.text.trim().length > 0) {
+                    root.importError = this.text.trim()
+                    root.importApplyRequested = false
+                }
+            }
+        }
+    }
+
     Rectangle {
         anchors.fill: parent
         color: "#0b0f14"
@@ -213,7 +255,7 @@ FloatingWindow {
                         }
 
                         Repeater {
-                            model: ["Overview", "Profiles", "Components", "Backups", "Settings"]
+                            model: ["Overview", "Profiles", "Import", "Components", "Backups", "Settings"]
 
                             delegate: Rectangle {
                                 required property string modelData
@@ -235,6 +277,7 @@ FloatingWindow {
                                             const icons = {
                                                 "Overview": "⌂",
                                                 "Profiles": "▤",
+                                                "Import": "⇧",
                                                 "Components": "◈",
                                                 "Backups": "⟲",
                                                 "Settings": "⚙"
@@ -789,6 +832,160 @@ FloatingWindow {
                     }
 
                     Column {
+                        visible: root.currentPage === "Import"
+                        width: parent.width
+                        spacing: 14
+
+                        Text {
+                            text: "IMPORT A LOCAL PROFILE"
+                            color: root.accent
+                            font.pixelSize: 10
+                            font.bold: true
+                            font.letterSpacing: 1.3
+                        }
+                        Text {
+                            text: "Enter a folder containing manifest.json. Preview validates the manifest and lists every file. Nothing is copied until you explicitly apply."
+                            color: root.muted
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+                        Rectangle {
+                            width: parent.width
+                            height: 46
+                            radius: 7
+                            color: "#101923"
+                            border.width: 1
+                            border.color: root.border
+                            TextInput {
+                                id: importPathInput
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+                                verticalAlignment: TextInput.AlignVCenter
+                                color: "#e7eff7"
+                                font.pixelSize: 12
+                                selectByMouse: true
+                                text: root.importSource
+                                onTextChanged: {
+                                    root.importSource = text
+                                    root.importPreview = ({})
+                                    root.importError = ""
+                                }
+                                clip: true
+                            }
+                        }
+                        Row {
+                            spacing: 10
+                            Rectangle {
+                                width: 112
+                                height: 36
+                                radius: 7
+                                color: "#1a2b38"
+                                border.width: 1
+                                border.color: "#315064"
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "PREVIEW"
+                                    color: root.accent
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: root.importSource.trim().length > 0 && !importProcess.running
+                                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    onClicked: {
+                                        root.importPreview = ({})
+                                        root.importError = ""
+                                        root.importApplyRequested = false
+                                        importProcess.running = true
+                                    }
+                                }
+                            }
+                            Rectangle {
+                                width: 112
+                                height: 36
+                                radius: 7
+                                color: "#173126"
+                                border.width: 1
+                                border.color: "#35664e"
+                                opacity: root.importPreview.dry_run === true && !importProcess.running ? 1 : 0.45
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "APPLY IMPORT"
+                                    color: "#8fe0b8"
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: root.importPreview.dry_run === true && !importProcess.running
+                                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                    onClicked: {
+                                        root.importApplyRequested = true
+                                        root.importError = "Importing into the Rice Manager profile library…"
+                                        importProcess.running = true
+                                    }
+                                }
+                            }
+                        }
+                        Text {
+                            width: parent.width
+                            text: root.importError
+                            color: root.importError.indexOf("successfully") >= 0 ? "#8fe0b8" : (root.importError.indexOf("Preview ready") >= 0 ? root.accent : "#ff9aa2")
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+                        Rectangle {
+                            visible: root.importPreview.profile_id !== undefined
+                            width: parent.width
+                            height: 104 + (root.importPreview.files ? root.importPreview.files.length * 22 : 0)
+                            radius: 9
+                            color: root.panel
+                            border.width: 1
+                            border.color: root.border
+                            Column {
+                                anchors.fill: parent
+                                anchors.margins: 14
+                                spacing: 7
+                                Text {
+                                    text: root.importPreview.profile_name + "  /  " + root.importPreview.profile_id
+                                    color: "#edf4fa"
+                                    font.pixelSize: 14
+                                    font.bold: true
+                                }
+                                Text {
+                                    text: "DESTINATION  " + root.importPreview.destination
+                                    color: root.muted
+                                    font.pixelSize: 10
+                                    wrapMode: Text.WrapAnywhere
+                                }
+                                Text {
+                                    text: "FILES  " + root.importPreview.file_count + "    SIZE  " + root.importPreview.total_bytes + " bytes"
+                                    color: root.accent
+                                    font.pixelSize: 10
+                                }
+                                Repeater {
+                                    model: root.importPreview.files ? root.importPreview.files : []
+                                    delegate: Text {
+                                        required property var modelData
+                                        text: modelData.path + "  (" + modelData.size + " bytes)"
+                                        color: "#b6c4d2"
+                                        font.pixelSize: 10
+                                        wrapMode: Text.WrapAnywhere
+                                    }
+                                }
+                            }
+                        }
+                        Text {
+                            text: "Library: ~/.local/share/rice-manager/profiles/  ·  Existing profiles are never overwritten. Imported files are stored separately; they are not installed or activated."
+                            color: "#718092"
+                            font.pixelSize: 10
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+
+                    Column {
                         visible: root.currentPage === "Profile Details"
                         width: parent.width
                         spacing: 14
@@ -941,7 +1138,7 @@ FloatingWindow {
                     }
 
                     Column {
-                        visible: root.currentPage !== "Overview" && root.currentPage !== "Components" && root.currentPage !== "Profiles" && root.currentPage !== "Profile Details"
+                        visible: root.currentPage !== "Overview" && root.currentPage !== "Components" && root.currentPage !== "Profiles" && root.currentPage !== "Import" && root.currentPage !== "Profile Details"
                         width: parent.width
                         spacing: 12
 
