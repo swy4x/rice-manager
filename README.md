@@ -78,7 +78,7 @@ The default library is `~/.local/share/rice-manager/profiles/<profile-id>/`. You
 
 ## Quickshell UI prototype
 
-The Quickshell dashboard reads manifests through the repository virtual environment and displays live read-only preflight results. The Profiles workspace discovers immediate child folders containing `manifest.json` under `examples/`, validates each manifest, and shows profile identity, component totals, and read-only preflight summaries. Select a valid profile to open its details, including each component's declared source, resolved target path, type, scope, required/read-only flags, and current preflight status. Invalid manifests are listed with their validation error. The Components workspace lists each manifest entry, its path, preflight status, and explanation. The Import workspace accepts a local profile directory, previews its validated manifest and file inventory, and exposes a separate Apply Import action only after a successful preview. Imported files go into the private Rice Manager profile library; they are not installed or activated. Run it directly from the repository without installing or changing your Quickshell configuration:
+The Quickshell dashboard reads manifests through the repository virtual environment and displays live read-only preflight results. The Profiles workspace discovers example profiles under `examples/` and separately lists imported profiles from `~/.local/share/rice-manager/profiles/`. Both lists validate manifests and expose read-only profile details. Select a valid profile to open its details, including each component's declared source, resolved target path, type, scope, required/read-only flags, and current preflight status. Invalid manifests are listed with their validation error. The Components workspace lists each manifest entry, its path, preflight status, and explanation. The Import workspace accepts a local profile directory, previews its validated manifest and file inventory, and exposes a separate Apply Import action only after a successful preview. Imported files go into the private Rice Manager profile library; they are not installed or activated. Run it directly from the repository without installing or changing your Quickshell configuration:
 
 ```bash
 qs -p ./ui
@@ -121,7 +121,7 @@ python -m unittest discover -s tests
 - [x] Initial Quickshell UI prototype
 - [x] Connect GUI to Python core (read-only preflight)
 - [x] Live read-only Components workspace
-- [x] Read-only Profiles workspace with multi-profile discovery
+- [x] Read-only Profiles workspace with example and imported-library discovery
 - [x] Read-only profile details with component metadata and preflight status
 - [x] Preview-first local profile directory importer (CLI and GUI)\n- [ ] Git repository importer
 - [ ] Dependency detection and optional install plans
