@@ -90,6 +90,7 @@ def import_profile(source: str | Path, library: str | Path | None = None) -> Pat
         shutil.rmtree(staging, ignore_errors=True)
         raise
 
+
 def preview_profile_removal(
     profile_id: str,
     library: str | Path | None = None,
