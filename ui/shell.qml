@@ -196,7 +196,7 @@ FloatingWindow {
         }
 
         onExited: (exitCode, exitStatus) => {
-            if (exitCode !== 0 && root.removalStatus.length === 0)
+            if (exitCode !== 0 && root.removalStatus.indexOf("Removing ") === 0)
                 root.removalStatus = "Profile removal failed."
         }
     }
