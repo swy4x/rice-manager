@@ -26,6 +26,15 @@ def _kind(path: Path) -> str:
     return "missing"
 
 
+def _has_symlink_path(path: Path) -> bool:
+    current = Path(path.anchor)
+    for part in path.parts[1:]:
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
+
+
 def _overlaps(first: Path, second: Path) -> bool:
     first = first.resolve(strict=False)
     second = second.resolve(strict=False)
@@ -43,6 +52,8 @@ def create_backup(manifest: Manifest, backup_root: str | Path | None = None) -> 
         Path.home() / ".local" / "share" / "rice-manager" / "backups"
     )
     root = root.absolute()
+    if _has_symlink_path(root):
+        raise BackupError("Backup destination contains a symlinked path component.")
 
     selected = [
         component for component in manifest.components
@@ -54,6 +65,8 @@ def create_backup(manifest: Manifest, backup_root: str | Path | None = None) -> 
     sources: list[tuple[object, Path, str]] = []
     for component in selected:
         source = resolve_source(component.source)
+        if _has_symlink_path(source.absolute()):
+            raise BackupError(f"Component path contains a symlink: {component.name} ({source})")
         actual_kind = _kind(source)
         if actual_kind == "missing":
             if component.required:
