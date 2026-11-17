@@ -230,7 +230,7 @@ def apply_profile_payload(
             "note": "File-level pre-apply safety snapshot; extra destination files were not changed.",
         }
         (safety_directory / "apply-safety.json").write_text(
-            json.dumps(metadata, indent=2) + "\\n", encoding="utf-8"
+            json.dumps(metadata, indent=2) + "\n", encoding="utf-8"
         )
 
         # Stage every payload file beside its destination so os.replace is atomic.
