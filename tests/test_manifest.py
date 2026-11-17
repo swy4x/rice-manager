@@ -65,6 +65,25 @@ class ManifestTests(unittest.TestCase):
         with self.assertRaises(ManifestError):
             load_manifest(self.write_manifest(data))
 
+
+    def test_load_optional_component_payload(self):
+        data = self.valid_data()
+        data["components"][0]["payload"] = "payload/hyprland"
+        manifest = load_manifest(self.write_manifest(data))
+        self.assertEqual(manifest.components[0].payload, "payload/hyprland")
+
+    def test_payload_defaults_to_none_for_legacy_manifests(self):
+        manifest = load_manifest(self.write_manifest(self.valid_data()))
+        self.assertIsNone(manifest.components[0].payload)
+
+    def test_reject_unsafe_payload_paths(self):
+        for payload in ("", "/etc/xdg", "../outside", "payload/../../outside", "payload\\hyprland"):
+            with self.subTest(payload=payload):
+                data = self.valid_data()
+                data["components"][0]["payload"] = payload
+                with self.assertRaises(ManifestError):
+                    load_manifest(self.write_manifest(data))
+
     def test_reject_duplicate_component_ids(self):
         data = self.valid_data()
         data["components"].append(dict(data["components"][0]))
