@@ -2,7 +2,7 @@
 
 A safety-first rice and dotfile profile manager for Arch Linux, starting with Hyprland and Quickshell.
 
-> **Status: early development.** Version 0.17 adds a GUI workspace for read-only package dependency checks. Package installation and profile activation are not implemented.
+> **Status: early development.** The v0.18 development line adds read-only, file-level profile payload inventory. Package installation and profile activation are not implemented.
 
 ## Goals
 
@@ -42,6 +42,15 @@ rice-manager profile inspect examples/caelestia/manifest.json
 rice-manager profile plan examples/caelestia/manifest.json
 rice-manager profile plan examples/caelestia/manifest.json --json
 ```
+
+Compare declared profile payload files with their destination without changing anything:
+
+```bash
+rice-manager profile inventory examples/caelestia/manifest.json
+rice-manager profile inventory examples/caelestia/manifest.json --json
+```
+
+The inventory command reads payload files relative to the profile directory and compares them with the declared user destinations. It reports `ADD`, `REPLACE`, `UNCHANGED`, and `CONFLICT` per file. Missing payloads remain compatible with older manifests; system-scoped and read-only components are skipped. Symlinked or unsafe payload/destination paths are blocked. Extra destination files are left alone: inventory never deletes, copies, or replaces files.
 
 Check explicitly declared package dependencies:
 
@@ -166,6 +175,7 @@ python -m unittest discover -s tests
 - [x] Refresh imported profile library from the GUI
 - [x] Explicit package dependency declarations and read-only pacman checks
 - [x] Read-only Dependencies workspace in the Quickshell GUI
+- [x] Read-only profile payload inventory engine and CLI
 - [ ] Git repository importer
 - [ ] Optional dependency installation workflow (explicit opt-in, future work)
 
