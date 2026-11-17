@@ -18,6 +18,8 @@ FloatingWindow {
     property color border: "#243140"
     property var planData: ({})
     property var profilesData: ({})
+    property var libraryData: ({})
+    property string libraryError: ""
     property string profilesError: ""
     property string selectedManifest: ""
     property string selectedProfileName: ""
@@ -35,6 +37,7 @@ FloatingWindow {
         backendError = ""
         planProcess.running = true
         profilesProcess.running = true
+        libraryProcess.running = true
         if (currentPage === "Profile Details" && selectedManifest.length > 0) {
             detailData = ({})
             detailError = ""
@@ -122,6 +125,36 @@ FloatingWindow {
             onStreamFinished: {
                 if (this.text.trim().length > 0)
                     root.profilesError = this.text.trim()
+            }
+        }
+    }
+
+
+    Process {
+        id: libraryProcess
+        command: [
+            Quickshell.shellDir + "/../.venv/bin/rice-manager",
+            "profile", "list",
+            Quickshell.env("HOME") + "/.local/share/rice-manager/profiles",
+            "--json"
+        ]
+        running: true
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.libraryData = JSON.parse(this.text)
+                    root.libraryError = ""
+                } catch (error) {
+                    root.libraryError = String(error)
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (this.text.trim().length > 0)
+                    root.libraryError = this.text.trim()
             }
         }
     }
@@ -829,10 +862,82 @@ FloatingWindow {
                             font.pixelSize: 10
                             wrapMode: Text.WordWrap
                         }
-                    }
 
-                    Column {
-                        visible: root.currentPage === "Import"
+                        Rectangle {
+                            width: parent.width
+                            height: 1
+                            color: root.border
+                        }
+
+                        Column {
+                            width: parent.width
+                            spacing: 10
+                            Text {
+                                text: "MY PROFILE LIBRARY"
+                                color: root.accent
+                                font.pixelSize: 10
+                                font.bold: true
+                                font.letterSpacing: 1.3
+                            }
+                            Text {
+                                text: root.libraryData.profiles
+                                    ? root.libraryData.profiles.length + " imported profiles"
+                                    : (root.libraryError.length > 0 ? "Library not created yet — import a profile to get started." : "Loading your library…")
+                                color: root.muted
+                                font.pixelSize: 11
+                            }
+                            Repeater {
+                                model: root.libraryData.profiles ? root.libraryData.profiles : []
+                                delegate: Rectangle {
+                                    required property var modelData
+                                    width: parent.width
+                                    height: modelData.valid ? 116 : 76
+                                    radius: 9
+                                    color: root.panel
+                                    border.width: 1
+                                    border.color: modelData.valid ? root.border : "#684044"
+                                    Column {
+                                        anchors.fill: parent
+                                        anchors.margins: 13
+                                        spacing: 6
+                                        Row {
+                                            width: parent.width
+                                            Text {
+                                                text: modelData.valid ? modelData.name : modelData.directory + " / INVALID"
+                                                color: "#edf4fa"
+                                                font.pixelSize: 13
+                                                font.bold: true
+                                            }
+                                            Item { width: 1; height: 1 }
+                                            Text {
+                                                text: modelData.valid ? (modelData.blocked ? "BLOCKED" : "VALID") : "INVALID"
+                                                color: modelData.valid ? (modelData.blocked ? "#ff7b86" : "#8fe0b8") : "#ff7b86"
+                                                font.pixelSize: 9
+                                                font.bold: true
+                                            }
+                                        }
+                                        Text {
+                                            text: modelData.valid ? "ID / " + modelData.id + "    VERSION / " + modelData.version : modelData.error
+                                            color: root.muted
+                                            font.pixelSize: 10
+                                            wrapMode: Text.WordWrap
+                                        }
+                                        Text {
+                                            text: modelData.manifest
+                                            color: "#718092"
+                                            font.pixelSize: 9
+                                            wrapMode: Text.WrapAnywhere
+                                        }
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        enabled: modelData.valid
+                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                        onClicked: root.openProfile(modelData.manifest, modelData.name)
+                                    }
+                                }
+                            }
+                        }
                         width: parent.width
                         spacing: 14
 
