@@ -32,9 +32,11 @@ class Manifest:
     version: str
     description: str
     components: tuple[Component, ...]
+    dependencies: tuple[str, ...] = ()
 
 
 _ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,47}$")
+_PACKAGE_NAME = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9@._+-]*$")
 _ALLOWED_VARS = {"HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME"}
 
 
@@ -87,6 +89,21 @@ def load_manifest(path: str | Path) -> Manifest:
     if not _ID.fullmatch(raw["id"]):
         raise ManifestError("'id' must be lowercase letters, numbers, and hyphens.")
 
+    raw_dependencies = raw.get("dependencies", [])
+    if not isinstance(raw_dependencies, list):
+        raise ManifestError("'dependencies' must be an array of Arch package names.")
+    dependencies: list[str] = []
+    seen_dependencies: set[str] = set()
+    for index, package in enumerate(raw_dependencies):
+        if not isinstance(package, str) or not _PACKAGE_NAME.fullmatch(package):
+            raise ManifestError(
+                f"dependencies[{index}] must be a valid Arch package name."
+            )
+        if package in seen_dependencies:
+            raise ManifestError(f"Duplicate package dependency: {package}")
+        seen_dependencies.add(package)
+        dependencies.append(package)
+
     entries = raw["components"]
     if not isinstance(entries, list) or not entries:
         raise ManifestError("'components' must be a non-empty array.")
@@ -131,4 +148,5 @@ def load_manifest(path: str | Path) -> Manifest:
         version=raw["version"],
         description=raw["description"],
         components=tuple(components),
+        dependencies=tuple(dependencies),
     )
