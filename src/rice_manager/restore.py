@@ -48,6 +48,15 @@ def _kind(path: Path) -> str:
     return "missing"
 
 
+def _has_any_symlink(path: Path) -> bool:
+    current = Path(path.anchor)
+    for part in path.parts[1:]:
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
+
+
 def _has_symlink(path: Path, stop: Path) -> bool:
     try:
         relative = path.relative_to(stop)
@@ -74,8 +83,8 @@ def _copy(source: Path, dest: Path, kind: str) -> None:
 
 def inspect_backup(backup_dir: str | Path) -> RestorePlan:
     root = Path(backup_dir).expanduser().absolute()
-    if root.is_symlink() or not root.is_dir():
-        raise RestoreError("Backup must be an existing, non-symlink directory.")
+    if root.is_symlink() or _has_any_symlink(root) or not root.is_dir():
+        raise RestoreError("Backup path must be an existing directory without symlinked path components.")
     metadata_path = root / "backup.json"
     if metadata_path.is_symlink() or not metadata_path.is_file():
         raise RestoreError("Backup metadata must be a regular, non-symlink file.")
@@ -155,6 +164,8 @@ def restore_backup(backup_dir: str | Path, *, apply: bool = False) -> RestorePla
 
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     safety_root.mkdir(parents=True, exist_ok=True)
+    if safety_root.is_symlink() or _has_symlink(safety_root, home) or not safety_root.is_dir():
+        raise RestoreError("Rice Manager safety-backup directory became unsafe.")
     safety = Path(tempfile.mkdtemp(prefix=f"pre-restore-{stamp}-", dir=safety_root))
     stages, moved = [], []
     try:
@@ -173,8 +184,9 @@ def restore_backup(backup_dir: str | Path, *, apply: bool = False) -> RestorePla
 
         for item in plan.items:
             item.target.parent.mkdir(parents=True, exist_ok=True)
-            if not _inside(item.target.parent.resolve(), home):
-                raise RestoreError(f"Destination parent escapes home: {item.target.parent}")
+            if (not _inside(item.target.parent.resolve(), home)
+                    or _has_symlink(item.target.parent, home)):
+                raise RestoreError(f"Destination parent escapes home or contains a symlink: {item.target.parent}")
             stage_dir = Path(tempfile.mkdtemp(prefix=".rice-manager-stage-", dir=item.target.parent))
             payload = stage_dir / "payload"
             _copy(item.source, payload, item.kind)
