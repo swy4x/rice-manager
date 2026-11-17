@@ -172,7 +172,9 @@ FloatingWindow {
         command: [
             Quickshell.shellDir + "/../.venv/bin/rice-manager",
             "profile", "deps",
-            Quickshell.shellDir + "/../examples/caelestia/manifest.json",
+            root.selectedManifest.length > 0
+                ? root.selectedManifest
+                : Quickshell.shellDir + "/../examples/caelestia/manifest.json",
             "--json"
         ]
         running: true
