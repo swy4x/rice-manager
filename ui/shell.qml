@@ -17,6 +17,8 @@ FloatingWindow {
     property color panel: "#121923"
     property color border: "#243140"
     property var planData: ({})
+    property var profilesData: ({})
+    property string profilesError: ""
     property string backendStatus: "LOADING"
     property string backendError: ""
 
@@ -24,6 +26,7 @@ FloatingWindow {
         backendStatus = "CHECKING"
         backendError = ""
         planProcess.running = true
+        profilesProcess.running = true
     }
 
     function statusColor(status) {
@@ -67,6 +70,37 @@ FloatingWindow {
         onExited: (exitCode, exitStatus) => {
             if (exitCode !== 0)
                 root.backendStatus = "BACKEND ERROR"
+        }
+    }
+
+
+    Process {
+        id: profilesProcess
+        command: [
+            Quickshell.shellDir + "/../.venv/bin/rice-manager",
+            "profile",
+            "list",
+            Quickshell.shellDir + "/../examples",
+            "--json"
+        ]
+        running: true
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    root.profilesData = JSON.parse(this.text)
+                    root.profilesError = ""
+                } catch (error) {
+                    root.profilesError = String(error)
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (this.text.trim().length > 0)
+                    root.profilesError = this.text.trim()
+            }
         }
     }
 
@@ -573,7 +607,6 @@ FloatingWindow {
                         Row {
                             width: parent.width
                             spacing: 12
-
                             Column {
                                 spacing: 4
                                 Text {
@@ -584,7 +617,9 @@ FloatingWindow {
                                     font.letterSpacing: 1.3
                                 }
                                 Text {
-                                    text: root.planData.profile ? "1 profile loaded from the example manifest" : "Waiting for profile data…"
+                                    text: root.profilesData.profiles
+                                        ? root.profilesData.profiles.length + " discovered profile entries"
+                                        : (root.profilesError.length > 0 ? root.profilesError : "Discovering manifests…")
                                     color: root.muted
                                     font.pixelSize: 11
                                 }
@@ -592,132 +627,101 @@ FloatingWindow {
                             Item { width: 1; height: 1 }
                         }
 
-                        Rectangle {
-                            width: parent.width
-                            height: 222
-                            radius: 11
-                            color: "#111d28"
-                            border.width: 1
-                            border.color: "#284050"
+                        Repeater {
+                            model: root.profilesData.profiles ? root.profilesData.profiles : []
+                            delegate: Rectangle {
+                                required property var modelData
+                                width: parent.width
+                                height: modelData.valid ? 164 : 86
+                                radius: 10
+                                color: root.panel
+                                border.width: 1
+                                border.color: modelData.valid ? root.border : "#684044"
 
-                            Column {
-                                anchors.fill: parent
-                                anchors.margins: 20
-                                spacing: 12
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 9
 
-                                Row {
-                                    width: parent.width
-                                    spacing: 10
-
-                                    Text {
-                                        text: "▤"
-                                        color: root.accent
-                                        font.pixelSize: 20
-                                    }
-
-                                    Column {
-                                        spacing: 3
+                                    Row {
+                                        width: parent.width
+                                        spacing: 10
                                         Text {
-                                            text: root.planData.profile ? root.planData.profile.name : "Profile unavailable"
-                                            color: "#edf4fa"
-                                            font.pixelSize: 18
-                                            font.bold: true
+                                            text: modelData.valid ? "▤" : "!"
+                                            color: modelData.valid ? root.accent : "#ff7b86"
+                                            font.pixelSize: 19
                                         }
-                                        Text {
-                                            text: root.planData.profile ? "ID  /  " + root.planData.profile.id : "No manifest loaded"
-                                            color: root.muted
-                                            font.pixelSize: 10
+                                        Column {
+                                            spacing: 3
+                                            Text {
+                                                text: modelData.valid ? modelData.name : modelData.directory + "  /  INVALID"
+                                                color: "#edf4fa"
+                                                font.pixelSize: 15
+                                                font.bold: true
+                                            }
+                                            Text {
+                                                text: modelData.valid ? "ID  /  " + modelData.id + "     VERSION  /  " + modelData.version : modelData.manifest
+                                                color: root.muted
+                                                font.pixelSize: 9
+                                            }
                                         }
-                                    }
-
-                                    Item { width: 1; height: 1 }
-
-                                    Rectangle {
-                                        width: 82
-                                        height: 25
-                                        radius: 12
-                                        color: root.planData.profile && !root.planData.blocked ? "#142a25" : "#30251a"
-                                        border.width: 1
-                                        border.color: root.planData.profile && !root.planData.blocked ? "#285647" : "#68502d"
+                                        Item { width: 1; height: 1 }
                                         Text {
-                                            anchors.centerIn: parent
-                                            text: root.planData.profile ? (root.planData.blocked ? "BLOCKED" : "LOADED") : "WAITING"
-                                            color: root.planData.profile && !root.planData.blocked ? "#8fe0b8" : "#f0c674"
+                                            text: modelData.valid ? (modelData.blocked ? "BLOCKED" : "VALID") : "INVALID"
+                                            color: modelData.valid ? (modelData.blocked ? "#ff7b86" : "#8fe0b8") : "#ff7b86"
                                             font.pixelSize: 9
                                             font.bold: true
                                         }
                                     }
-                                }
 
-                                Rectangle {
-                                    width: parent.width
-                                    height: 1
-                                    color: root.border
-                                }
-
-                                Row {
-                                    width: parent.width
-                                    spacing: 10
-
-                                    Repeater {
-                                        model: [
-                                            { label: "COMPONENTS", value: root.planData.items ? String(root.planData.items.length).padStart(2, "0") : "--" },
-                                            { label: "READY", value: root.planData.summary ? String(root.planData.summary.ready).padStart(2, "0") : "--" },
-                                            { label: "SKIPPED", value: root.planData.summary ? String(root.planData.summary.skipped).padStart(2, "0") : "--" },
-                                            { label: "BLOCKED", value: root.planData.summary ? String(root.planData.summary.blocked).padStart(2, "0") : "--" }
-                                        ]
-
-                                        delegate: Rectangle {
-                                            required property var modelData
-                                            width: (parent.width - 30) / 4
-                                            height: 62
-                                            radius: 7
-                                            color: "#0c141d"
-                                            border.width: 1
-                                            border.color: root.border
-
-                                            Column {
-                                                anchors.centerIn: parent
-                                                spacing: 5
-                                                Text {
-                                                    anchors.horizontalCenter: parent.horizontalCenter
-                                                    text: modelData.value
-                                                    color: "#eaf4fb"
-                                                    font.pixelSize: 18
-                                                    font.bold: true
-                                                }
-                                                Text {
-                                                    anchors.horizontalCenter: parent.horizontalCenter
-                                                    text: modelData.label
-                                                    color: root.muted
-                                                    font.pixelSize: 8
-                                                    font.bold: true
-                                                }
-                                            }
-                                        }
+                                    Text {
+                                        visible: modelData.valid
+                                        width: parent.width
+                                        text: modelData.description
+                                        color: "#b6c4d2"
+                                        font.pixelSize: 10
+                                        wrapMode: Text.WordWrap
                                     }
-                                }
 
-                                Text {
-                                    width: parent.width
-                                    text: "Manifest  /  examples/caelestia/manifest.json"
-                                    color: "#b6c4d2"
-                                    font.pixelSize: 10
-                                    wrapMode: Text.WrapAnywhere
-                                }
+                                    Row {
+                                        visible: modelData.valid
+                                        spacing: 18
+                                        Text { text: "COMPONENTS  " + modelData.component_count; color: root.muted; font.pixelSize: 9 }
+                                        Text { text: "READY  " + modelData.summary.ready; color: "#8fe0b8"; font.pixelSize: 9 }
+                                        Text { text: "SKIPPED  " + modelData.summary.skipped; color: root.accent; font.pixelSize: 9 }
+                                        Text { text: "BLOCKED  " + modelData.summary.blocked; color: modelData.summary.blocked > 0 ? "#ff7b86" : root.muted; font.pixelSize: 9 }
+                                    }
 
-                                Text {
-                                    width: parent.width
-                                    text: "Profile inventory and readiness are read from the Python preflight. Profile activation is not available."
-                                    color: root.muted
-                                    font.pixelSize: 10
-                                    wrapMode: Text.WordWrap
+                                    Text {
+                                        visible: !modelData.valid
+                                        width: parent.width
+                                        text: modelData.error
+                                        color: "#ff9aa2"
+                                        font.pixelSize: 10
+                                        wrapMode: Text.WordWrap
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.manifest
+                                        color: "#718092"
+                                        font.pixelSize: 9
+                                        wrapMode: Text.WrapAnywhere
+                                    }
                                 }
                             }
                         }
 
                         Text {
-                            text: "This build displays the configured example profile. Multi-profile discovery and switching are future work."
+                            visible: root.profilesData.profiles && root.profilesData.profiles.length === 0
+                            text: "No profiles found. Add a profile folder containing manifest.json under examples/."
+                            color: root.muted
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Text {
+                            text: "Discovery validates manifests and runs a read-only preflight. No profile is activated and no configuration files are changed."
                             color: "#718092"
                             font.pixelSize: 10
                             wrapMode: Text.WordWrap
