@@ -48,6 +48,21 @@ def _kind(path: Path) -> str:
     return "missing"
 
 
+def _has_symlink(path: Path, stop: Path) -> bool:
+    try:
+        relative = path.relative_to(stop)
+    except ValueError:
+        return True
+    current = stop
+    for part in relative.parts:
+        if part in {"", ".", ".."}:
+            return True
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
+
+
 def _copy(source: Path, dest: Path, kind: str) -> None:
     if kind == "config-directory":
         shutil.copytree(source, dest, symlinks=True, copy_function=shutil.copy2)
@@ -61,8 +76,11 @@ def inspect_backup(backup_dir: str | Path) -> RestorePlan:
     root = Path(backup_dir).expanduser().absolute()
     if root.is_symlink() or not root.is_dir():
         raise RestoreError("Backup must be an existing, non-symlink directory.")
+    metadata_path = root / "backup.json"
+    if metadata_path.is_symlink() or not metadata_path.is_file():
+        raise RestoreError("Backup metadata must be a regular, non-symlink file.")
     try:
-        data = json.loads((root / "backup.json").read_text(encoding="utf-8"))
+        data = json.loads(metadata_path.read_text(encoding="utf-8"))
     except OSError as exc:
         raise RestoreError(f"Cannot read backup metadata: {exc}") from exc
     except json.JSONDecodeError as exc:
@@ -93,11 +111,12 @@ def inspect_backup(backup_dir: str | Path) -> RestorePlan:
             raise RestoreError(f"Invalid backup component declaration: {cid}")
         target = Path(target_text)
         resolved_target = target.resolve(strict=False)
-        if resolved_target == home or not _inside(resolved_target, home):
-            raise RestoreError(f"Refusing destination outside home directory: {target}")
+        if (resolved_target == home or not _inside(resolved_target, home)
+                or _has_symlink(target, home)):
+            raise RestoreError(f"Refusing unsafe or symlinked destination path: {target}")
         source = root / rel
-        if source.is_symlink() or not _inside(source.resolve(strict=False), root.resolve()):
-            raise RestoreError(f"Unsafe backup component path: {rel}")
+        if (_has_symlink(source, root) or not _inside(source.resolve(strict=False), root.resolve())):
+            raise RestoreError(f"Unsafe or symlinked backup component path: {rel}")
         if _kind(source) != kind:
             raise RestoreError(f"Backup component missing or wrong type: {cid}")
         items.append(RestoreItem(cid, name, source, target, kind))
@@ -116,19 +135,21 @@ def restore_backup(backup_dir: str | Path, *, apply: bool = False) -> RestorePla
 
     home = Path.home().resolve()
     safety_root = home / ".local/share/rice-manager/backups"
-    if safety_root.is_symlink() or not _inside(safety_root.resolve(strict=False), home):
+    if (_has_symlink(safety_root, home)
+            or not _inside(safety_root.resolve(strict=False), home)):
         raise RestoreError("Rice Manager safety-backup path is unsafe (symlink or outside home).")
     safety_root = safety_root.resolve(strict=False)
     for item in plan.items:
-        if item.target.is_symlink():
-            raise RestoreError(f"Refusing symlink destination: {item.target}")
+        if _has_symlink(item.target, home):
+            raise RestoreError(f"Refusing symlinked destination path: {item.target}")
         if item.target.exists() and _kind(item.target) != item.kind:
             raise RestoreError(f"Destination type mismatch: {item.target}")
         parent = item.target.parent
         if parent.exists() and not parent.is_dir():
             raise RestoreError(f"Destination parent is not a directory: {parent}")
-        if not _inside(parent.resolve(strict=False), home):
-            raise RestoreError(f"Destination parent escapes home: {parent}")
+        if (not _inside(parent.resolve(strict=False), home)
+                or _has_symlink(parent, home)):
+            raise RestoreError(f"Destination parent is unsafe or symlinked: {parent}")
         if item.target == safety_root or _inside(item.target, safety_root) or _inside(safety_root, item.target):
             raise RestoreError("Restore destination overlaps Rice Manager's safety-backup directory.")
 
