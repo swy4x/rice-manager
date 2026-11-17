@@ -7,6 +7,7 @@ import json
 
 from . import __version__
 from .backup import BackupError, create_backup
+from .dependencies import check_dependencies
 from .restore import RestoreError, restore_backup
 from .manifest import ManifestError, load_manifest, resolve_source
 from .planner import build_switch_plan
@@ -35,10 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
         ("validate", "Validate a profile manifest."),
         ("inspect", "Inspect profile component paths (read-only)."),
         ("plan", "Preview profile activation prerequisites (read-only)."),
+        ("deps", "Check declared package dependencies (read-only)."),
     ):
         sub = profile_commands.add_parser(name, help=help_text)
         sub.add_argument("manifest", help="Path to a profile manifest JSON file.")
-        if name == "plan":
+        if name in {"plan", "deps"}:
             sub.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
 
     list_parser = profile_commands.add_parser(
@@ -111,6 +113,26 @@ def _plan_json(plan, manifest) -> dict:
         "blocked": plan.blocked,
         "dry_run": True,
     }
+
+
+def _print_dependency_report(report: dict) -> None:
+    profile = report["profile"]
+    print(f"Dependency check: {profile['name']} ({profile['id']})")
+    if report["status"] == "not-required":
+        print("No package dependencies declared.")
+    elif report["status"] == "unavailable":
+        print("Package check unavailable; dependencies could not be verified.")
+    else:
+        for item in report["dependencies"]:
+            print(f"  [{item['status']}] {item['name']}")
+        print(
+            f"\nInstalled: {len(report['installed'])} | "
+            f"Missing: {len(report['missing'])}"
+        )
+        if report["install_command"]:
+            print("\nSuggested command (not executed):")
+            print(f"  {report['install_command']}")
+    print("Read-only check: no packages were installed or changed.")
 
 
 def main() -> None:
@@ -214,6 +236,14 @@ def main() -> None:
                 return
 
             manifest = load_manifest(args.manifest)
+            if args.profile_command == "deps":
+                report = check_dependencies(manifest)
+                if args.json:
+                    print(json.dumps(report, indent=2))
+                else:
+                    _print_dependency_report(report)
+                return
+
             if args.profile_command == "validate":
                 print(f"Valid manifest: {manifest.name} ({manifest.id})")
                 print(f"Version: {manifest.version}")
