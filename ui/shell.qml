@@ -938,6 +938,10 @@ FloatingWindow {
                                 }
                             }
                         }
+                    }
+
+                    Column {
+                        visible: root.currentPage === "Import"
                         width: parent.width
                         spacing: 14
 
