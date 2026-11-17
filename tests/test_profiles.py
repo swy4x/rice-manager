@@ -51,9 +51,13 @@ class ProfileDiscoveryTests(unittest.TestCase):
             result = discover_profiles(root)
 
         self.assertEqual(len(result), 2)
-        self.assertTrue(result[0]["valid"])
-        self.assertFalse(result[1]["valid"])
-        self.assertIn("error", result[1])
+        by_directory = {
+            Path(item["manifest"]).parent.name: item
+            for item in result
+        }
+        self.assertTrue(by_directory["valid"]["valid"])
+        self.assertFalse(by_directory["broken"]["valid"])
+        self.assertIn("error", by_directory["broken"])
 
     def test_rejects_missing_directory(self):
         with tempfile.TemporaryDirectory() as temp:
