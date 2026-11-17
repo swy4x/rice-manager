@@ -60,6 +60,42 @@ class RestoreTests(unittest.TestCase):
                 with self.assertRaises(RestoreError):
                     inspect_backup(backup)
 
+    def test_rejects_symlinked_backup_metadata(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp); home = base / "home"; home.mkdir()
+            backup = self.make_backup(base, home / ".config/hypr")
+            metadata = backup / "backup.json"
+            data = metadata.read_text()
+            metadata.unlink()
+            outside = base / "metadata.json"
+            outside.write_text(data)
+            metadata.symlink_to(outside)
+            with patch("rice_manager.restore.Path.home", return_value=home):
+                with self.assertRaises(RestoreError):
+                    inspect_backup(backup)
+
+    def test_rejects_symlinked_backup_components_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp); home = base / "home"; home.mkdir()
+            backup = self.make_backup(base, home / ".config/hypr")
+            components = backup / "components"
+            moved = backup / "components-real"
+            components.rename(moved)
+            components.symlink_to(moved, target_is_directory=True)
+            with patch("rice_manager.restore.Path.home", return_value=home):
+                with self.assertRaises(RestoreError):
+                    inspect_backup(backup)
+
+    def test_rejects_symlinked_destination_parent_inside_home(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp); home = base / "home"; home.mkdir()
+            real_config = home / "real-config"; real_config.mkdir()
+            (home / ".config").symlink_to(real_config, target_is_directory=True)
+            backup = self.make_backup(base, home / ".config/hypr")
+            with patch("rice_manager.restore.Path.home", return_value=home):
+                with self.assertRaises(RestoreError):
+                    inspect_backup(backup)
+
     def test_rejects_traversal_backup_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             base = Path(tmp); home = base / "home"; home.mkdir()
