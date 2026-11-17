@@ -27,6 +27,8 @@ FloatingWindow {
     property string detailError: ""
     property string importSource: ""
     property string importError: ""
+    property string pendingRemovalId: ""
+    property string removalStatus: ""
     property var importPreview: ({})
     property bool importApplyRequested: false
     property string backendStatus: "LOADING"
@@ -158,6 +160,47 @@ FloatingWindow {
             }
         }
     }
+
+    Process {
+        id: removeProfileProcess
+        command: [
+            Quickshell.shellDir + "/../.venv/bin/rice-manager",
+            "profile", "remove", root.pendingRemovalId,
+            "--library", Quickshell.env("HOME") + "/.local/share/rice-manager/profiles",
+            "--apply", "--json"
+        ]
+        running: false
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                try {
+                    const result = JSON.parse(this.text)
+                    if (result.removed === true) {
+                        root.removalStatus = "Removed " + result.profile_id + " from the Rice Manager library."
+                        root.pendingRemovalId = ""
+                        root.refreshPlan()
+                    } else {
+                        root.removalStatus = "Removal was not confirmed by the backend."
+                    }
+                } catch (error) {
+                    root.removalStatus = "Could not read removal result: " + String(error)
+                }
+            }
+        }
+
+        stderr: StdioCollector {
+            onStreamFinished: {
+                if (this.text.trim().length > 0)
+                    root.removalStatus = this.text.trim()
+            }
+        }
+
+        onExited: (exitCode, exitStatus) => {
+            if (exitCode !== 0 && root.removalStatus.length === 0)
+                root.removalStatus = "Profile removal failed."
+        }
+    }
+
 
     Process {
         id: detailProcess
@@ -872,12 +915,40 @@ FloatingWindow {
                         Column {
                             width: parent.width
                             spacing: 10
-                            Text {
-                                text: "MY PROFILE LIBRARY"
-                                color: root.accent
-                                font.pixelSize: 10
-                                font.bold: true
-                                font.letterSpacing: 1.3
+                            Row {
+                                width: parent.width
+                                Text {
+                                    text: "MY PROFILE LIBRARY"
+                                    color: root.accent
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    font.letterSpacing: 1.3
+                                }
+                                Item { width: 1; height: 1 }
+                                Rectangle {
+                                    width: 88
+                                    height: 28
+                                    radius: 6
+                                    color: "#18232e"
+                                    border.width: 1
+                                    border.color: root.border
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "↻ REFRESH"
+                                        color: root.accent
+                                        font.pixelSize: 9
+                                        font.bold: true
+                                    }
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        cursorShape: Qt.PointingHandCursor
+                                        onClicked: {
+                                            root.removalStatus = ""
+                                            root.pendingRemovalId = ""
+                                            root.refreshPlan()
+                                        }
+                                    }
+                                }
                             }
                             Text {
                                 text: root.libraryData.profiles
@@ -886,19 +957,30 @@ FloatingWindow {
                                 color: root.muted
                                 font.pixelSize: 11
                             }
+                            Text {
+                                visible: root.removalStatus.length > 0
+                                width: parent.width
+                                text: root.removalStatus
+                                color: root.removalStatus.indexOf("Removed ") === 0 ? "#8fe0b8" : "#ff9aa2"
+                                font.pixelSize: 10
+                                wrapMode: Text.WordWrap
+                            }
                             Repeater {
                                 model: root.libraryData.profiles ? root.libraryData.profiles : []
                                 delegate: Rectangle {
                                     required property var modelData
                                     width: parent.width
-                                    height: modelData.valid ? 116 : 76
+                                    height: modelData.valid ? 154 : 76
                                     radius: 9
                                     color: root.panel
                                     border.width: 1
                                     border.color: modelData.valid ? root.border : "#684044"
                                     Column {
                                         anchors.fill: parent
-                                        anchors.margins: 13
+                                        anchors.leftMargin: 13
+                                        anchors.rightMargin: 13
+                                        anchors.topMargin: 13
+                                        anchors.bottomMargin: modelData.valid ? 45 : 13
                                         spacing: 6
                                         Row {
                                             width: parent.width
@@ -934,6 +1016,68 @@ FloatingWindow {
                                         enabled: modelData.valid
                                         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                         onClicked: root.openProfile(modelData.manifest, modelData.name)
+                                    }
+                                    Row {
+                                        anchors.left: parent.left
+                                        anchors.bottom: parent.bottom
+                                        anchors.leftMargin: 13
+                                        anchors.bottomMargin: 10
+                                        spacing: 8
+                                        visible: modelData.valid
+
+                                        Rectangle {
+                                            width: root.pendingRemovalId === modelData.id ? 112 : 82
+                                            height: 26
+                                            radius: 6
+                                            color: root.pendingRemovalId === modelData.id ? "#3a2025" : "#2a2022"
+                                            border.width: 1
+                                            border.color: "#75434a"
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: root.pendingRemovalId === modelData.id ? "CONFIRM REMOVE" : "REMOVE"
+                                                color: "#ff9aa2"
+                                                font.pixelSize: 9
+                                                font.bold: true
+                                            }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    if (root.pendingRemovalId === modelData.id) {
+                                                        root.removalStatus = "Removing " + modelData.id + " from the private library…"
+                                                        removeProfileProcess.running = true
+                                                    } else {
+                                                        root.pendingRemovalId = modelData.id
+                                                        root.removalStatus = "Confirm removal of " + modelData.name + ". Only its imported library copy will be deleted."
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            visible: root.pendingRemovalId === modelData.id
+                                            width: 64
+                                            height: 26
+                                            radius: 6
+                                            color: "#18232e"
+                                            border.width: 1
+                                            border.color: root.border
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "CANCEL"
+                                                color: root.muted
+                                                font.pixelSize: 9
+                                                font.bold: true
+                                            }
+                                            MouseArea {
+                                                anchors.fill: parent
+                                                cursorShape: Qt.PointingHandCursor
+                                                onClicked: {
+                                                    root.pendingRemovalId = ""
+                                                    root.removalStatus = ""
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             }
