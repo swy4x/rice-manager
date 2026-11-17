@@ -2,7 +2,7 @@
 
 A safety-first rice and dotfile profile manager for Arch Linux, starting with Hyprland and Quickshell.
 
-> **Status: early development.** Version 0.12 adds a preview-first local profile importer. It validates manifests, inventories files, rejects symlinks, and requires an explicit apply flag. Profile activation and Git-based importing are not implemented yet.
+> **Status: early development.** Version 0.15 adds preview-first removal of validated profiles from Rice Manager's private library, plus GUI refresh and confirmed removal controls. Profile activation and Git-based importing are not implemented yet.
 
 ## Goals
 
@@ -76,6 +76,20 @@ The preview validates `manifest.json` and lists every regular file and its size.
 
 The default library is `~/.local/share/rice-manager/profiles/<profile-id>/`. You can choose another library with `--library /path/to/library`. Import copies the profile package into that library only; it does not follow manifest source paths, modify `~/.config`, touch `/etc/xdg`, install dependencies, or activate the profile. Existing library entries are never overwritten.
 
+Preview removal of one imported profile by its manifest ID:
+
+```bash
+rice-manager profile remove profile-id
+```
+
+This validates the target directory and manifest without changing files. Only after reviewing the target, explicitly remove the library copy:
+
+```bash
+rice-manager profile remove profile-id --apply
+```
+
+Removal is restricted to a real profile directory directly inside the selected library. The directory must contain a valid regular manifest whose ID matches its directory name. Symlinked profile directories, invalid manifests, and path-traversal IDs are rejected. This removes only the imported package from the Rice Manager library; it never follows manifest source paths or changes active desktop configuration.
+
 ## Quickshell UI prototype
 
 The Quickshell dashboard reads manifests through the repository virtual environment and displays live read-only preflight results. The Profiles workspace discovers example profiles under `examples/` and separately lists imported profiles from `~/.local/share/rice-manager/profiles/`. Both lists validate manifests and expose read-only profile details. Select a valid profile to open its details, including each component's declared source, resolved target path, type, scope, required/read-only flags, and current preflight status. Invalid manifests are listed with their validation error. The Components workspace lists each manifest entry, its path, preflight status, and explanation. The Import workspace accepts a local profile directory, previews its validated manifest and file inventory, and exposes a separate Apply Import action only after a successful preview. Imported files go into the private Rice Manager profile library; they are not installed or activated. Run it directly from the repository without installing or changing your Quickshell configuration:
@@ -123,7 +137,10 @@ python -m unittest discover -s tests
 - [x] Live read-only Components workspace
 - [x] Read-only Profiles workspace with example and imported-library discovery
 - [x] Read-only profile details with component metadata and preflight status
-- [x] Preview-first local profile directory importer (CLI and GUI)\n- [ ] Git repository importer
+- [x] Preview-first local profile directory importer (CLI and GUI)
+- [x] Preview-first removal of imported profiles (CLI and GUI)
+- [x] Refresh imported profile library from the GUI
+- [ ] Git repository importer
 - [ ] Dependency detection and optional install plans
 
 ## License
