@@ -36,6 +36,15 @@ def _has_symlink(path: Path, home: Path) -> bool:
     return False
 
 
+def _safe_unlink(path: Path, home: Path) -> None:
+    if _has_symlink(path, home):
+        return
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
 def _remove_empty_directories(paths: list[Path]) -> None:
     for path in reversed(paths):
         try:
@@ -239,20 +248,18 @@ def apply_profile_payload(
             if source.is_symlink() or not source.is_file():
                 raise ActivationError(f"Payload changed during apply preparation: {source}")
             target = item["target"]
+            if _has_symlink(target, home):
+                raise ActivationError(f"Destination path changed during staging: {target}")
             fd, temp_name = tempfile.mkstemp(prefix=".rice-manager-stage-", dir=target.parent)
             os.close(fd)
             staged = Path(temp_name)
-            try:
-                shutil.copy2(source, staged, follow_symlinks=False)
-            except Exception:
-                staged.unlink(missing_ok=True)
-                raise
             staged_files.append((staged, target))
+            shutil.copy2(source, staged, follow_symlinks=False)
 
         for index, (staged, target) in enumerate(staged_files):
             original = original_states[index]
-            if target.is_symlink():
-                raise ActivationError(f"Destination changed during installation: {target}")
+            if _has_symlink(target, home):
+                raise ActivationError(f"Destination path changed during installation: {target}")
             currently_exists = target.exists()
             if currently_exists != original["existed"]:
                 raise ActivationError(f"Destination changed during installation: {target}")
@@ -291,6 +298,8 @@ def apply_profile_payload(
                     if signature != item["installed_signature"]:
                         raise OSError("destination changed after installation; refusing to overwrite it")
                 if item["existed"] and item["backup"] is not None:
+                    if _has_symlink(target, home):
+                        raise OSError("destination path contains a symlink before rollback staging")
                     fd, temp_name = tempfile.mkstemp(prefix=".rice-manager-rollback-", dir=target.parent)
                     os.close(fd)
                     rollback_stage = Path(temp_name)
@@ -298,13 +307,11 @@ def apply_profile_payload(
                         shutil.copy2(item["backup"], rollback_stage, follow_symlinks=False)
                         os.replace(rollback_stage, target)
                     finally:
-                        rollback_stage.unlink(missing_ok=True)
+                        _safe_unlink(rollback_stage, home)
                 elif target.exists():
                     target.unlink()
             except Exception as rollback_exc:
                 rollback_errors.append(f"{target}: {rollback_exc}")
-        for staged, _ in staged_files:
-            staged.unlink(missing_ok=True)
         _remove_empty_directories(created_directories)
         if rollback_errors:
             raise ActivationError(
@@ -319,4 +326,4 @@ def apply_profile_payload(
         ) from exc
     finally:
         for staged, _ in staged_files:
-            staged.unlink(missing_ok=True)
+            _safe_unlink(staged, home)
