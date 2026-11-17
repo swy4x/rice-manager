@@ -26,13 +26,20 @@ FloatingWindow {
         planProcess.running = true
     }
 
+    function statusColor(status) {
+        if (status === "ready") return "#8fe0b8"
+        if (status === "skipped") return "#8be9fd"
+        if (status.indexOf("blocked-") === 0) return "#ff7b86"
+        return "#f0c674"
+    }
+
     Process {
         id: planProcess
         command: [
-            "rice-manager",
+            Quickshell.shellDir + "/../.venv/bin/rice-manager",
             "profile",
             "plan",
-            decodeURIComponent(Qt.resolvedUrl("../examples/caelestia/manifest.json").toString().replace("file://", "")),
+            Quickshell.shellDir + "/../examples/caelestia/manifest.json",
             "--json"
         ]
         running: true
@@ -437,7 +444,129 @@ FloatingWindow {
                     }
 
                     Column {
-                        visible: root.currentPage !== "Overview"
+                        visible: root.currentPage === "Components"
+                        width: parent.width
+                        spacing: 14
+
+                        Row {
+                            width: parent.width
+                            spacing: 12
+
+                            Column {
+                                spacing: 4
+                                Text {
+                                    text: "COMPONENT INVENTORY"
+                                    color: root.accent
+                                    font.pixelSize: 10
+                                    font.bold: true
+                                    font.letterSpacing: 1.3
+                                }
+                                Text {
+                                    text: root.planData.profile
+                                        ? root.planData.profile.name + "  /  " + root.planData.items.length + " manifest entries"
+                                        : "Waiting for profile data…"
+                                    color: root.muted
+                                    font.pixelSize: 11
+                                }
+                            }
+
+                            Item { width: 1; height: 1 }
+                        }
+
+                        Text {
+                            visible: !(root.planData.items && root.planData.items.length > 0)
+                            width: parent.width
+                            text: root.backendError.length > 0
+                                ? root.backendError
+                                : "No component data available yet. Refresh the backend status above."
+                            color: root.muted
+                            font.pixelSize: 12
+                            wrapMode: Text.WordWrap
+                        }
+
+                        Repeater {
+                            model: root.planData.items ? root.planData.items : []
+
+                            delegate: Rectangle {
+                                required property var modelData
+                                width: parent.width
+                                height: 132
+                                radius: 10
+                                color: root.panel
+                                border.width: 1
+                                border.color: root.border
+
+                                Column {
+                                    anchors.fill: parent
+                                    anchors.margins: 16
+                                    spacing: 7
+
+                                    Row {
+                                        width: parent.width
+                                        spacing: 10
+
+                                        Text {
+                                            width: parent.width - 104
+                                            text: modelData.name
+                                            color: "#eaf4fb"
+                                            font.pixelSize: 14
+                                            font.bold: true
+                                            elide: Text.ElideRight
+                                        }
+
+                                        Rectangle {
+                                            width: 88
+                                            height: 22
+                                            radius: 11
+                                            color: "#18232e"
+                                            border.width: 1
+                                            border.color: root.statusColor(modelData.status)
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: modelData.status.toUpperCase()
+                                                color: root.statusColor(modelData.status)
+                                                font.pixelSize: 9
+                                                font.bold: true
+                                                font.letterSpacing: 0.5
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        text: modelData.component_id
+                                        color: root.accent
+                                        font.pixelSize: 10
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.path
+                                        color: "#b6c4d2"
+                                        font.pixelSize: 11
+                                        wrapMode: Text.WrapAnywhere
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        text: modelData.detail
+                                        color: root.muted
+                                        font.pixelSize: 10
+                                        wrapMode: Text.WordWrap
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            text: "Read-only preflight data. No configuration files are changed by this page."
+                            color: "#718092"
+                            font.pixelSize: 10
+                        }
+                    }
+
+                    Column {
+                        visible: root.currentPage !== "Overview" && root.currentPage !== "Components"
                         width: parent.width
                         spacing: 12
 
@@ -480,7 +609,7 @@ FloatingWindow {
 
                                 Text {
                                     anchors.horizontalCenter: parent.horizontalCenter
-                                    text: "The interface is scaffolded; backend integration is not connected yet."
+                                    text: "This workspace is scaffolded; its backend actions are not implemented yet."
                                     color: root.muted
                                     font.pixelSize: 11
                                 }
