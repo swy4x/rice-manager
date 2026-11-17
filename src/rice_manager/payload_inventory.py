@@ -120,7 +120,8 @@ def build_payload_inventory(manifest: Manifest, profile_directory: str | Path) -
 
             for relative, data in payload_files:
                 target = destination / relative if component.kind == "config-directory" else destination
-                action, detail = _destination_action(target, data, destination)
+                destination_root = destination.parent if component.kind == "config-file" else destination
+                action, detail = _destination_action(target, data, destination_root)
                 base["files"].append({
                     "path": relative,
                     "destination": str(target),
