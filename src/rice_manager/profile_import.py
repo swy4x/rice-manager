@@ -90,11 +90,11 @@ def import_profile(source: str | Path, library: str | Path | None = None) -> Pat
         shutil.rmtree(staging, ignore_errors=True)
         raise
 
-def remove_imported_profile(
+def preview_profile_removal(
     profile_id: str,
     library: str | Path | None = None,
-) -> Path:
-    """Remove one validated profile directory from the private profile library."""
+) -> dict:
+    """Validate and describe one profile removal without changing files."""
     import re
 
     if not isinstance(profile_id, str) or not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,47}", profile_id):
@@ -122,9 +122,24 @@ def remove_imported_profile(
     if manifest.id != profile_id:
         raise ProfileImportError("Profile directory name does not match its manifest ID.")
 
+    return {
+        "profile_id": manifest.id,
+        "profile_name": manifest.name,
+        "destination": str(destination),
+        "dry_run": True,
+        "removed": False,
+    }
+
+
+def remove_imported_profile(
+    profile_id: str,
+    library: str | Path | None = None,
+) -> Path:
+    """Remove one validated profile directory from the private profile library."""
+    plan = preview_profile_removal(profile_id, library)
+    destination = Path(plan["destination"])
     try:
         shutil.rmtree(destination)
     except OSError as exc:
         raise ProfileImportError(f"Could not remove imported profile: {exc}") from exc
     return destination
-
