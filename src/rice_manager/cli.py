@@ -173,7 +173,7 @@ def main() -> None:
                 for item in plan["files"]:
                     print(f"    {item['path']} ({item['size']} bytes)")
                 if not args.apply:
-                    print("\\nRun the same command with --apply only after reviewing this file list.")
+                    print("\nRun the same command with --apply only after reviewing this file list.")
                 return
 
             if args.profile_command == "restore":
