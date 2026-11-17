@@ -49,7 +49,22 @@ def _payload_files(path: Path, kind: str) -> list[tuple[str, bytes]]:
     return sorted(files)
 
 
-def _destination_action(target: Path, payload: bytes) -> tuple[str, str]:
+def _contains_symlink(path: Path, stop: Path) -> bool:
+    try:
+        relative = path.relative_to(stop)
+    except ValueError:
+        return True
+    current = stop
+    for part in relative.parts:
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
+
+
+def _destination_action(target: Path, payload: bytes, destination_root: Path) -> tuple[str, str]:
+    if _contains_symlink(target.parent, destination_root):
+        return "CONFLICT", "A destination parent is a symlink; it will not be followed."
     if target.is_symlink():
         return "CONFLICT", "Destination entry is a symlink; it will not be followed."
     if not target.exists():
@@ -90,8 +105,8 @@ def build_payload_inventory(manifest: Manifest, profile_directory: str | Path) -
             payload_path = _safe_payload_path(root, component.payload)
             payload_files = _payload_files(payload_path, component.kind)
             destination = resolve_source(component.source)
-            if destination.is_symlink():
-                raise PayloadInventoryError("Destination is a symlink.")
+            if _contains_symlink(destination, home):
+                raise PayloadInventoryError("Destination path contains a symlink.")
             resolved_destination = destination.resolve(strict=False)
             try:
                 resolved_destination.relative_to(home)
@@ -105,7 +120,7 @@ def build_payload_inventory(manifest: Manifest, profile_directory: str | Path) -
 
             for relative, data in payload_files:
                 target = destination / relative if component.kind == "config-directory" else destination
-                action, detail = _destination_action(target, data)
+                action, detail = _destination_action(target, data, destination)
                 base["files"].append({
                     "path": relative,
                     "destination": str(target),
