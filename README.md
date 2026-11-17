@@ -64,11 +64,21 @@ rice-manager profile restore /path/to/backup --apply
 
 When applying, existing destinations are copied to a timestamped `pre-restore-*` safety snapshot before replacement. Restore refuses destinations outside your home directory, symlink destinations, invalid metadata, and unsafe backup paths. System-wide configuration is not restored.
 
-The `profile plan` command is a dry-run preflight only. It checks user component paths, required components, declared file/directory types, and unsafe destinations. System-scoped and read-only components are skipped. It does not install profile files or switch the active desktop; transactional activation is future work.\n\nImport a local profile directory into Rice Manager's private library. Preview first; no files are written in preview mode:\n\n```bash\nrice-manager profile import /path/to/profile-directory\n```\n\nThe preview validates `manifest.json` and lists every regular file and its size. It rejects symlinks, special filesystem entries, source/library overlap, invalid manifests, and profile ID collisions. After reviewing the list, explicitly apply the import:\n\n```bash\nrice-manager profile import /path/to/profile-directory --apply\n```\n\nThe default library is `~/.local/share/rice-manager/profiles/<profile-id>/`. You can choose another library with `--library /path/to/library`. Import copies the profile package into that library only; it does not follow manifest source paths, modify `~/.config`, touch `/etc/xdg`, install dependencies, or activate the profile. Existing library entries are never overwritten.
+The `profile plan` command is a dry-run preflight only. It checks user component paths, required components, declared file/directory types, and unsafe destinations. System-scoped and read-only components are skipped. It does not install profile files or switch the active desktop; transactional activation is future work.
+
+Import a local profile directory into Rice Manager's private library. Preview first; no files are written in preview mode:
+
+```bash\nrice-manager profile import /path/to/profile-directory\n```
+
+The preview validates `manifest.json` and lists every regular file and its size. It rejects symlinks, special filesystem entries, source/library overlap, invalid manifests, and profile ID collisions. After reviewing the list, explicitly apply the import:
+
+```bash\nrice-manager profile import /path/to/profile-directory --apply\n```
+
+The default library is `~/.local/share/rice-manager/profiles/<profile-id>/`. You can choose another library with `--library /path/to/library`. Import copies the profile package into that library only; it does not follow manifest source paths, modify `~/.config`, touch `/etc/xdg`, install dependencies, or activate the profile. Existing library entries are never overwritten.
 
 ## Quickshell UI prototype
 
-The Quickshell dashboard reads manifests through the repository virtual environment and displays live read-only preflight results. The Profiles workspace discovers immediate child folders containing `manifest.json` under `examples/`, validates each manifest, and shows profile identity, component totals, and read-only preflight summaries. Select a valid profile to open its details, including each component's declared source, resolved target path, type, scope, required/read-only flags, and current preflight status. Invalid manifests are listed with their validation error. The Components workspace lists each manifest entry, its path, preflight status, and explanation. It does not execute profile actions. Run it directly from the repository without installing or changing your Quickshell configuration:
+The Quickshell dashboard reads manifests through the repository virtual environment and displays live read-only preflight results. The Profiles workspace discovers immediate child folders containing `manifest.json` under `examples/`, validates each manifest, and shows profile identity, component totals, and read-only preflight summaries. Select a valid profile to open its details, including each component's declared source, resolved target path, type, scope, required/read-only flags, and current preflight status. Invalid manifests are listed with their validation error. The Components workspace lists each manifest entry, its path, preflight status, and explanation. The Import workspace accepts a local profile directory, previews its validated manifest and file inventory, and exposes a separate Apply Import action only after a successful preview. Imported files go into the private Rice Manager profile library; they are not installed or activated. Run it directly from the repository without installing or changing your Quickshell configuration:
 
 ```bash
 qs -p ./ui
@@ -113,7 +123,7 @@ python -m unittest discover -s tests
 - [x] Live read-only Components workspace
 - [x] Read-only Profiles workspace with multi-profile discovery
 - [x] Read-only profile details with component metadata and preflight status
-- [x] Preview-first local profile directory importer (CLI)\n- [ ] Git repository importer
+- [x] Preview-first local profile directory importer (CLI and GUI)\n- [ ] Git repository importer
 - [ ] Dependency detection and optional install plans
 
 ## License
