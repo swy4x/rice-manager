@@ -2,7 +2,7 @@
 
 A safety-first rice and dotfile profile manager for Arch Linux, starting with Hyprland and Quickshell.
 
-> **Status: early development.** Version 0.15 adds preview-first removal of validated profiles from Rice Manager's private library, plus GUI refresh and confirmed removal controls. Profile activation and Git-based importing are not implemented yet.
+> **Status: early development.** Version 0.16 adds optional, explicit package dependency declarations and a read-only pacman check. Package installation and profile activation are not implemented.
 
 ## Goals
 
@@ -22,6 +22,7 @@ A safety-first rice and dotfile profile manager for Arch Linux, starting with Hy
 - Backups are explicit and never overwrite an existing backup.
 - System-wide configurations (such as `/etc/xdg`) are detected but never modified or backed up automatically.
 - Restore is limited to destinations inside the user's home directory. System-wide and read-only configuration is never restored.
+- Dependency checks only query the installed package database; they never install or change packages.
 
 ## Commands
 
@@ -41,6 +42,15 @@ rice-manager profile inspect examples/caelestia/manifest.json
 rice-manager profile plan examples/caelestia/manifest.json
 rice-manager profile plan examples/caelestia/manifest.json --json
 ```
+
+Check explicitly declared package dependencies:
+
+```bash
+rice-manager profile deps examples/caelestia/manifest.json
+rice-manager profile deps examples/caelestia/manifest.json --json
+```
+
+The command reads the local pacman package database with `pacman -Q`. If dependencies are missing, it prints a suggested `sudo pacman -S --needed ...` command for you to review and run yourself. Rice Manager never executes that command. If pacman is unavailable or the query fails, dependencies are reported as unverified. Profiles without a `dependencies` field remain valid and need no package query.
 
 Back up writable user components:
 
@@ -68,11 +78,15 @@ The `profile plan` command is a dry-run preflight only. It checks user component
 
 Import a local profile directory into Rice Manager's private library. Preview first; no files are written in preview mode:
 
-```bash\nrice-manager profile import /path/to/profile-directory\n```
+```bash
+rice-manager profile import /path/to/profile-directory
+```
 
 The preview validates `manifest.json` and lists every regular file and its size. It rejects symlinks, special filesystem entries, source/library overlap, invalid manifests, and profile ID collisions. After reviewing the list, explicitly apply the import:
 
-```bash\nrice-manager profile import /path/to/profile-directory --apply\n```
+```bash
+rice-manager profile import /path/to/profile-directory --apply
+```
 
 The default library is `~/.local/share/rice-manager/profiles/<profile-id>/`. You can choose another library with `--library /path/to/library`. Import copies the profile package into that library only; it does not follow manifest source paths, modify `~/.config`, touch `/etc/xdg`, install dependencies, or activate the profile. Existing library entries are never overwritten.
 
@@ -103,6 +117,16 @@ This uses Quickshell's standard floating application window. The UI invokes `ric
 ## Manifest format
 
 Manifest schema version 1 is JSON. Each component declares an ID, display name, kind, source path, and scope (`user` or `system`). Optional flags mark required components and read-only sources. The only supported path variables are `${HOME}`, `${XDG_CONFIG_HOME}`, and `${XDG_DATA_HOME}`; they are expanded as literal paths, never as shell code.
+
+An optional top-level `dependencies` array declares Arch package names required by the profile. These are explicit package names, not commands or shell snippets. For example:
+
+```json
+{
+  "dependencies": ["hyprland", "waybar", "qt6-wayland"]
+}
+```
+
+Package names are validated and duplicates are rejected. The dependency checker uses this list only; it does not scan or execute profile files.
 
 ## Development
 
@@ -140,8 +164,9 @@ python -m unittest discover -s tests
 - [x] Preview-first local profile directory importer (CLI and GUI)
 - [x] Preview-first removal of imported profiles (CLI and GUI)
 - [x] Refresh imported profile library from the GUI
+- [x] Explicit package dependency declarations and read-only pacman checks
 - [ ] Git repository importer
-- [ ] Dependency detection and optional install plans
+- [ ] Optional dependency installation workflow (explicit opt-in, future work)
 
 ## License
 
