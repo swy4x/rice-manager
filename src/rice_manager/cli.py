@@ -17,6 +17,7 @@ from .payload_inventory import PayloadInventoryError, build_payload_inventory
 from .profiles import ProfileDiscoveryError, discover_profiles
 from .profile_import import ProfileImportError, import_profile, preview_profile_import, preview_profile_removal, remove_imported_profile
 from .system import inspect_path, inspect_system
+from .shell_switch import ShellSwitchError, switch_shell, start_selected_shell
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -27,6 +28,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
 
     commands = parser.add_subparsers(dest="command", required=True)
+    switch_parser = commands.add_parser(
+        "switch",
+        help="Preview or switch desktop shells.",
+    )
+    switch_parser.add_argument(
+        "target",
+        choices=("cartoon-shell", "caelestia"),
+    )
+    switch_parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="Perform the shell switch.",
+    )
+    commands.add_parser("shell-start", help=argparse.SUPPRESS)
+
     inspect_parser = commands.add_parser(
         "inspect",
         help="Inspect desktop configuration paths (read-only).",
@@ -151,6 +167,43 @@ def _print_dependency_report(report: dict) -> None:
 
 def main() -> None:
     args = build_parser().parse_args()
+
+    if args.command == "shell-start":
+        try:
+            start_selected_shell()
+        except ShellSwitchError as exc:
+            raise SystemExit(
+                f"Rice Manager error: {exc}"
+            ) from exc
+        return
+
+    if args.command == "switch":
+        try:
+            report = switch_shell(
+                args.target,
+                apply=args.apply,
+            )
+        except ShellSwitchError as exc:
+            raise SystemExit(
+                f"Rice Manager error: {exc}"
+            ) from exc
+
+        mode = "applied" if args.apply else "preview"
+        print(f"Shell switch {mode}: {report['name']}")
+        print(
+            "Currently running: "
+            + (
+                ", ".join(report["currently_running"])
+                or "none"
+            )
+        )
+
+        if not args.apply:
+            print("Preview only. No processes or files changed.")
+            print("Use --apply to perform the switch.")
+        else:
+            print("Active shell selection saved.")
+        return
 
     if args.command == "inspect":
         report = inspect_system()
