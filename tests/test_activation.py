@@ -233,5 +233,50 @@ class ActivationTests(unittest.TestCase):
             self.assertFalse(installed.is_symlink())
             self.assertFalse(installed.exists())
 
+
+    def test_installed_signature_is_captured_before_replace(self):
+        import os
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            destination = home / ".config" / "hypr"
+            destination.mkdir(parents=True)
+            target = destination / "hyprland.conf"
+            target.write_text("original", encoding="utf-8")
+
+            profile, manifest = self.make_profile(home)
+
+            real_replace = os.replace
+            real_stat = Path.stat
+            replaced = {"value": False}
+            failed = {"value": False}
+
+            def replace_then_mark(source, dest):
+                result = real_replace(source, dest)
+                if Path(dest) == target:
+                    replaced["value"] = True
+                return result
+
+            def fail_installed_stat(path, *args, **kwargs):
+                if path == target and replaced["value"] and not failed["value"]:
+                    failed["value"] = True
+                    raise OSError("simulated metadata failure")
+                return real_stat(path, *args, **kwargs)
+
+            with patch(
+                "rice_manager.activation.os.replace",
+                side_effect=replace_then_mark,
+            ), patch(
+                "rice_manager.activation.Path.stat",
+                autospec=True,
+                side_effect=fail_installed_stat,
+            ):
+                report = self.run_apply(home, profile, manifest, apply=True)
+
+            self.assertTrue(report["applied"])
+            self.assertEqual(target.read_text(encoding="utf-8"), "new config")
+            self.assertFalse(failed["value"])
+
+
 if __name__ == "__main__":
     unittest.main()

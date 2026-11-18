@@ -272,16 +272,17 @@ def apply_profile_payload(
                 signature = (current.st_dev, current.st_ino, current.st_size, current.st_mtime_ns)
                 if signature != original["signature"]:
                     raise ActivationError(f"Destination changed during installation: {target}")
+            staged_stat = staged.stat(follow_symlinks=False)
+            installed_signature = (
+                staged_stat.st_dev, staged_stat.st_ino,
+                staged_stat.st_size, staged_stat.st_mtime_ns,
+            )
             os.replace(staged, target)
-            installed_stat = target.stat(follow_symlinks=False)
             installed.append({
                 "target": target,
                 "existed": original["existed"],
                 "backup": original["backup"],
-                "installed_signature": (
-                    installed_stat.st_dev, installed_stat.st_ino,
-                    installed_stat.st_size, installed_stat.st_mtime_ns,
-                ),
+                "installed_signature": installed_signature,
             })
 
         report["dry_run"] = False
