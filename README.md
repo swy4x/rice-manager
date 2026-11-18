@@ -2,7 +2,7 @@
 
 A safety-first rice and dotfile profile manager for Arch Linux, starting with Hyprland and Quickshell.
 
-> **Status: v0.19.0.** Rice Manager provides profile inspection, validation, inventory, import management, dependency checks, and explicit preview-first transactional payload installation. Package installation and desktop process/session management are not implemented.
+> **Status: v0.19.1.** Rice Manager provides profile inspection, validation, inventory, import management, dependency checks, and explicit preview-first transactional payload installation. Package installation and desktop process/session management are not implemented.
 
 ## Goals
 
