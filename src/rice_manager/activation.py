@@ -37,7 +37,7 @@ def _has_symlink(path: Path, home: Path) -> bool:
 
 
 def _safe_unlink(path: Path, home: Path) -> None:
-    if _has_symlink(path, home):
+    if _has_symlink(path.parent, home):
         return
     try:
         path.unlink(missing_ok=True)
@@ -255,6 +255,10 @@ def apply_profile_payload(
             staged = Path(temp_name)
             staged_files.append((staged, target))
             shutil.copy2(source, staged, follow_symlinks=False)
+            if staged.is_symlink() or not staged.is_file():
+                raise ActivationError(
+                    f"Staged payload is not a regular file: {staged}"
+                )
 
         for index, (staged, target) in enumerate(staged_files):
             original = original_states[index]

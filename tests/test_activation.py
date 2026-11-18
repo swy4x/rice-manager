@@ -203,5 +203,35 @@ class ActivationTests(unittest.TestCase):
             self.assertTrue(destination.is_symlink())
             self.assertFalse((outside / "hyprland.conf").exists())
 
+
+    def test_payload_replaced_with_symlink_during_staging_is_rejected(self):
+        import shutil
+
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            profile, manifest = self.make_profile(home)
+            payload_file = profile / "payload/hypr/hyprland.conf"
+            outside = home / "outside"
+            outside.write_text("outside secret", encoding="utf-8")
+
+            real_copy2 = shutil.copy2
+            calls = {"count": 0}
+
+            def replace_source_during_staging(source, destination, *, follow_symlinks=True):
+                if Path(source) == payload_file:
+                    calls["count"] += 1
+                    if calls["count"] == 1:
+                        payload_file.unlink()
+                        payload_file.symlink_to(outside)
+                return real_copy2(source, destination, follow_symlinks=follow_symlinks)
+
+            with patch("rice_manager.activation.shutil.copy2", side_effect=replace_source_during_staging):
+                with self.assertRaises(ActivationError):
+                    self.run_apply(home, profile, manifest, apply=True)
+
+            installed = home / ".config/hypr/hyprland.conf"
+            self.assertFalse(installed.is_symlink())
+            self.assertFalse(installed.exists())
+
 if __name__ == "__main__":
     unittest.main()
