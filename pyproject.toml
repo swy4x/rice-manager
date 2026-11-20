@@ -14,6 +14,7 @@ dependencies = []
 
 [project.scripts]
 rice-manager = "rice_manager.cli:main"
+rice-manager-gui = "rice_manager.gui:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

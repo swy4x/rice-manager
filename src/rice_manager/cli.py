@@ -16,6 +16,7 @@ from .planner import build_switch_plan
 from .payload_inventory import PayloadInventoryError, build_payload_inventory
 from .profiles import ProfileDiscoveryError, discover_profiles
 from .profile_import import ProfileImportError, import_profile, preview_profile_import, preview_profile_removal, remove_imported_profile
+from .github_import import GitHubImportError, scan_github_repository
 from .system import inspect_path, inspect_system
 from .shell_switch import ShellSwitchError, switch_shell, start_selected_shell
 
@@ -34,14 +35,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     switch_parser.add_argument(
         "target",
-        choices=("cartoon-shell", "caelestia"),
+        help="Shell ID (built-in or installed GitHub shell).",
     )
     switch_parser.add_argument(
         "--apply",
         action="store_true",
         help="Perform the shell switch.",
     )
-    commands.add_parser("shell-start", help=argparse.SUPPRESS)
+    commands.add_parser("shell-start", help="Start the saved desktop shell at login.")
 
     inspect_parser = commands.add_parser(
         "inspect",
@@ -64,6 +65,11 @@ def build_parser() -> argparse.ArgumentParser:
             sub.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
         if name == "inventory":
             sub.add_argument("--profile-dir", help="Profile directory (default: manifest directory).")
+    scan_parser = profile_commands.add_parser(
+        "scan", help="Scan a public GitHub dotfiles repository (read-only)."
+    )
+    scan_parser.add_argument("url", help="Public GitHub repository URL.")
+    scan_parser.add_argument("--json", action="store_true", help="Print machine-readable JSON.")
 
     apply_parser = profile_commands.add_parser(
         "apply", help="Preview or explicitly apply a profile payload transaction."
@@ -302,6 +308,31 @@ def main() -> None:
                     print("\nRun the same command with --apply to restore these components.")
                 return
 
+            if args.profile_command == "scan":
+                report = scan_github_repository(args.url)
+                if args.json:
+                    print(json.dumps(report, indent=2))
+                    return
+
+                repository = report["repository"]
+                summary = report["summary"]
+
+                print(f"GitHub repository scan: {repository["name"]}")
+                print(f"URL: {repository["url"]}")
+                print(f"Default branch: {repository["branch"]}")
+                print(f"\nFiles scanned: {summary["files_scanned"]}")
+                print(f"Components detected: {summary["components_detected"]}")
+
+                for component in report["components"]:
+                    print(f"\n  {component["name"]}")
+                    print(f"    Source: {component["source_root"]}")
+                    print(f"    Destination: {component["destination"]}")
+                    print(f"    Files: {component["file_count"]}")
+                    print(f"    Dependency: {component["dependency"]}")
+
+                print("\nRead-only scan. No files installed or changed.")
+                return
+
             manifest = load_manifest(args.manifest)
             if args.profile_command == "apply":
                 profile_directory = args.profile_dir or str(Path(args.manifest).expanduser().parent)
@@ -399,7 +430,7 @@ def main() -> None:
                 print("Only writable user components were included; system/read-only components were skipped.")
                 return
 
-        except (ManifestError, BackupError, RestoreError, ActivationError, ProfileDiscoveryError, ProfileImportError, PayloadInventoryError) as exc:
+        except (ManifestError, BackupError, RestoreError, ActivationError, ProfileDiscoveryError, ProfileImportError, PayloadInventoryError, GitHubImportError) as exc:
             raise SystemExit(f"Rice Manager error: {exc}") from exc
 
 
